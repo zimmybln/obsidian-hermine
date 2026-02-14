@@ -1,0 +1,868 @@
+/* Hermine Plugin Styles */
+
+.hermine-container {
+  margin: 1em 0;
+  overflow-x: auto;
+}
+
+/* Title */
+.hermine-title {
+  margin: 0 0 0.5em 0;
+  padding: 0;
+  color: var(--text-normal);
+  font-size: 1.2em;
+}
+
+/* Error display */
+.hermine-errors {
+  padding: 1em;
+  background-color: var(--background-modifier-error);
+  border-radius: var(--radius-s);
+}
+
+.hermine-error {
+  color: var(--text-error);
+  padding: 0.5em;
+}
+
+/* Empty state */
+.hermine-empty {
+  padding: 2em;
+  text-align: center;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Table styles */
+.hermine-table,
+.hermine-matrix {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-ui-small);
+}
+
+.hermine-table th,
+.hermine-table td,
+.hermine-matrix th,
+.hermine-matrix td {
+  padding: 0.5em 0.75em;
+  border: 1px solid var(--background-modifier-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.hermine-table th,
+.hermine-matrix th {
+  background-color: var(--background-secondary);
+  font-weight: var(--font-semibold);
+  position: sticky;
+  top: 0;
+}
+
+.hermine-table tbody tr:hover,
+.hermine-matrix tbody tr:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+/* Cell styles */
+.hermine-cell-name {
+  white-space: nowrap;
+}
+
+.hermine-cell-name a {
+  color: var(--text-accent);
+  text-decoration: none;
+}
+
+.hermine-cell-name a:hover {
+  text-decoration: underline;
+}
+
+.hermine-cell-editable {
+  min-width: 100px;
+}
+
+/* ==========================================
+   BOARD LAYOUT (Visual Matrix)
+   ========================================== */
+
+/* Wrapper for Y-axis label + board */
+.hermine-board-layout {
+  display: flex;
+  align-items: stretch;
+}
+
+/* Y-axis label (rotated, left side) */
+.hermine-axis-label-y {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-right: 8px;
+}
+
+.hermine-axis-label-y span {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-weight: var(--font-semibold);
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  white-space: nowrap;
+}
+
+/* X-axis label (centered below data columns) */
+.hermine-axis-label-x {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 8px;
+}
+
+.hermine-axis-label-x span {
+  font-weight: var(--font-semibold);
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+.hermine-board {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  background: linear-gradient(135deg, var(--background-secondary) 0%, var(--background-primary) 100%);
+  border-radius: var(--radius-m);
+  min-width: fit-content;
+}
+
+/* Corner cell (empty top-left) */
+.hermine-board-corner {
+  min-width: 100px;
+  min-height: 40px;
+}
+
+/* X-axis header labels (top) */
+.hermine-board-header-x {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 16px;
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  font-weight: var(--font-semibold);
+  font-size: var(--font-ui-small);
+  border-radius: var(--radius-s);
+  text-align: center;
+  min-height: 40px;
+}
+
+/* Y-axis header labels (left side) */
+.hermine-board-header-y {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 12px 16px;
+  background-color: var(--background-secondary);
+  color: var(--text-normal);
+  font-weight: var(--font-semibold);
+  font-size: var(--font-ui-small);
+  border-radius: var(--radius-s);
+  text-align: right;
+  min-width: 100px;
+  border: 1px solid var(--background-modifier-border);
+}
+
+/* Board cells (drop zones) */
+.hermine-board-cell {
+  min-width: 150px;
+  min-height: 100px;
+  padding: 8px;
+  background-color: var(--background-primary);
+  border: 2px dashed var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hermine-board-cell:hover {
+  border-color: var(--background-modifier-border-hover);
+  background-color: var(--background-primary-alt);
+}
+
+/* Items container inside board cell */
+.hermine-board-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+/* Document card styles */
+.hermine-card {
+  display: flex;
+  align-items: stretch;
+  background-color: var(--background-secondary);
+  border-radius: var(--radius-s);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  cursor: grab;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  overflow: hidden;
+}
+
+.hermine-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.hermine-card:active {
+  cursor: grabbing;
+  transform: scale(0.98);
+}
+
+.hermine-card.hermine-card-dragging {
+  opacity: 0.6;
+  transform: rotate(3deg);
+}
+
+/* Color indicator bar on the left */
+.hermine-card-color {
+  width: 4px;
+  min-height: 100%;
+  flex-shrink: 0;
+}
+
+/* Card content */
+.hermine-card-content {
+  padding: 8px 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.hermine-card-title {
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+  font-weight: var(--font-medium);
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hermine-card:hover .hermine-card-title {
+  color: var(--text-accent);
+}
+
+/* Drop zone states */
+.hermine-board-cell.hermine-drop-zone-active {
+  border-style: solid;
+  border-color: var(--interactive-accent);
+  background-color: var(--background-modifier-hover);
+}
+
+.hermine-board-cell.hermine-drop-zone-hover {
+  background-color: color-mix(in srgb, var(--interactive-accent) 20%, transparent) !important;
+  border-color: var(--interactive-accent) !important;
+  border-style: solid !important;
+  transform: scale(1.02);
+}
+
+/* ==========================================
+   OLD TABLE-BASED MATRIX (fallback)
+   ========================================== */
+
+.hermine-matrix th:first-child {
+  min-width: 150px;
+}
+
+.hermine-matrix-cell {
+  min-width: 80px;
+  min-height: 60px;
+  vertical-align: middle;
+  text-align: center;
+  transition: background-color 0.2s ease;
+}
+
+.hermine-matrix-cell-empty {
+  background-color: var(--background-secondary-alt);
+}
+
+/* Dots container (for table view) */
+.hermine-dots-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+  padding: 4px;
+}
+
+/* Document dot wrapper (dot + title) for table view */
+.hermine-dot-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: grab;
+  padding: 2px 6px 2px 2px;
+  border-radius: var(--radius-s);
+  transition: background-color 0.15s ease;
+  max-width: 100%;
+}
+
+.hermine-dot-wrapper:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.hermine-dot-wrapper:active {
+  cursor: grabbing;
+}
+
+.hermine-dot-wrapper.hermine-dot-dragging {
+  opacity: 0.5;
+}
+
+/* Document dot styles */
+.hermine-dot {
+  width: 12px;
+  height: 12px;
+  min-width: 12px;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
+}
+
+/* Document title next to dot */
+.hermine-dot-title {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px;
+}
+
+.hermine-dot-wrapper:hover .hermine-dot-title {
+  color: var(--text-accent);
+}
+
+/* General drop zone styles */
+.hermine-drop-zone-active {
+  background-color: var(--background-modifier-hover);
+}
+
+.hermine-drop-zone-hover {
+  background-color: var(--interactive-accent) !important;
+  opacity: 0.3;
+}
+
+/* Preview popup styles */
+.hermine-preview {
+  position: fixed;
+  z-index: 1000;
+  width: 400px;
+  max-height: 300px;
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.hermine-preview-header {
+  padding: 0.75em 1em;
+  background-color: var(--background-secondary);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.hermine-preview-title {
+  font-weight: var(--font-semibold);
+  color: var(--text-normal);
+}
+
+.hermine-preview-content {
+  padding: 1em;
+  max-height: 230px;
+  overflow-y: auto;
+  font-size: var(--font-ui-small);
+}
+
+.hermine-preview-content p {
+  margin: 0 0 0.5em 0;
+}
+
+.hermine-preview-content p:last-child {
+  margin-bottom: 0;
+}
+
+.hermine-preview-error {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Legend styles */
+/* Unassigned documents section */
+.hermine-unassigned {
+  margin-top: 1em;
+  padding: 0.75em;
+  background-color: var(--background-secondary);
+  border-radius: var(--radius-s);
+  border: 1px dashed var(--background-modifier-border);
+}
+
+.hermine-unassigned-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+  margin-top: 0.5em;
+}
+
+/* Old matrix doc styles (for backward compatibility) */
+.hermine-matrix-doc {
+  padding: 0.25em 0;
+  border-bottom: 1px solid var(--background-modifier-border-hover);
+}
+
+.hermine-matrix-doc:last-child {
+  border-bottom: none;
+}
+
+.hermine-matrix-doc a {
+  color: var(--text-accent);
+  text-decoration: none;
+  font-weight: var(--font-medium);
+}
+
+.hermine-matrix-doc a:hover {
+  text-decoration: underline;
+}
+
+.hermine-matrix-prop {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  margin-top: 0.25em;
+}
+
+.hermine-prop-label {
+  color: var(--text-faint);
+}
+
+/* Editable wrapper */
+.hermine-editable-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+  width: 100%;
+}
+
+.hermine-value-display {
+  flex: 1;
+  cursor: pointer;
+}
+
+.hermine-value-display:hover {
+  background-color: var(--background-modifier-hover);
+  border-radius: var(--radius-s);
+}
+
+.hermine-value-input {
+  flex: 1;
+  padding: 0.25em 0.5em;
+  border: 1px solid var(--background-modifier-border-focus);
+  border-radius: var(--radius-s);
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  font-size: inherit;
+  min-width: 80px;
+}
+
+.hermine-value-input:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
+}
+
+/* Buttons */
+.hermine-edit-btn,
+.hermine-save-btn,
+.hermine-cancel-btn {
+  padding: 0.125em 0.25em;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  border-radius: var(--radius-s);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.hermine-editable-wrapper:hover .hermine-edit-btn,
+.hermine-save-btn,
+.hermine-cancel-btn {
+  opacity: 1;
+}
+
+.hermine-edit-btn:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.hermine-save-btn {
+  color: var(--text-success);
+}
+
+.hermine-save-btn:hover {
+  background-color: var(--background-modifier-success);
+}
+
+.hermine-cancel-btn {
+  color: var(--text-error);
+}
+
+.hermine-cancel-btn:hover {
+  background-color: var(--background-modifier-error);
+}
+
+/* Toolbar */
+.hermine-toolbar {
+  margin-top: 0.75em;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1em;
+  flex-wrap: wrap;
+}
+
+/* Zoom controls */
+.hermine-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.25em;
+  background-color: var(--background-secondary);
+  padding: 0.25em;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.hermine-zoom-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background-color: transparent;
+  border: none;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all 0.15s ease;
+}
+
+.hermine-zoom-btn:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.hermine-zoom-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.hermine-zoom-display {
+  min-width: 50px;
+  padding: 0.25em 0.5em;
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  color: var(--text-normal);
+  font-size: var(--font-ui-smaller);
+  text-align: center;
+  transition: all 0.15s ease;
+}
+
+.hermine-zoom-display:hover {
+  background-color: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border-hover);
+}
+
+.hermine-zoom-slider {
+  width: 80px;
+  height: 4px;
+  margin: 0 0.5em;
+  cursor: pointer;
+  accent-color: var(--interactive-accent);
+}
+
+.hermine-zoom-slider::-webkit-slider-thumb {
+  cursor: grab;
+}
+
+.hermine-zoom-slider::-webkit-slider-thumb:active {
+  cursor: grabbing;
+}
+
+/* Zoom wrapper for board */
+.hermine-zoom-wrapper {
+  overflow: auto;
+  padding: 8px;
+  margin: -8px;
+}
+
+.hermine-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.375em 0.75em;
+  background-color: var(--interactive-normal);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+  transition: background-color 0.15s ease;
+}
+
+.hermine-refresh-btn:hover {
+  background-color: var(--interactive-hover);
+}
+
+.hermine-refresh-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Value Picker Modal */
+.hermine-value-picker-modal {
+  max-width: 420px;
+}
+
+.hermine-value-picker-modal h3 {
+  margin-top: 0;
+  margin-bottom: 0.5em;
+}
+
+.hermine-picker-info {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  margin-bottom: 1em;
+  padding: 0.5em 0.75em;
+  background-color: var(--background-secondary);
+  border-radius: var(--radius-s);
+}
+
+.hermine-picker-input-container {
+  margin-bottom: 0.75em;
+}
+
+.hermine-picker-input {
+  width: 100%;
+  padding: 0.5em 0.75em;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  font-size: var(--font-ui-medium);
+}
+
+.hermine-picker-input:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
+}
+
+.hermine-picker-validation {
+  font-size: var(--font-ui-small);
+  min-height: 1.5em;
+  margin-bottom: 0.75em;
+  padding: 0.25em 0;
+}
+
+.hermine-picker-valid {
+  color: var(--text-success);
+}
+
+.hermine-picker-invalid {
+  color: var(--text-error);
+}
+
+.hermine-picker-suggestions {
+  margin-bottom: 1em;
+}
+
+.hermine-picker-suggestions-label {
+  display: block;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  margin-bottom: 0.5em;
+}
+
+.hermine-picker-suggestions-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375em;
+}
+
+.hermine-picker-chip {
+  padding: 0.25em 0.625em;
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  cursor: pointer;
+  color: var(--text-normal);
+  font-size: var(--font-ui-smaller);
+  transition: all 0.15s ease;
+}
+
+.hermine-picker-chip:hover {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+.hermine-picker-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5em;
+  margin-top: 1em;
+}
+
+.hermine-picker-confirm,
+.hermine-picker-cancel {
+  padding: 0.5em 1.25em;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  font-size: var(--font-ui-small);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.hermine-picker-confirm {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+.hermine-picker-confirm:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.hermine-picker-confirm:not(:disabled):hover {
+  filter: brightness(1.1);
+}
+
+.hermine-picker-cancel {
+  background-color: var(--interactive-normal);
+  color: var(--text-normal);
+}
+
+.hermine-picker-cancel:hover {
+  background-color: var(--interactive-hover);
+}
+
+/* Error flash animation */
+.hermine-error-flash {
+  animation: error-flash 0.5s ease;
+}
+
+@keyframes error-flash {
+  0%, 100% {
+    background-color: transparent;
+  }
+  50% {
+    background-color: var(--background-modifier-error);
+  }
+}
+
+/* Settings page styles */
+.hermine-settings-usage {
+  background-color: var(--background-secondary);
+  padding: 1em;
+  border-radius: var(--radius-m);
+  margin-top: 1em;
+}
+
+.hermine-settings-usage pre {
+  background-color: var(--background-primary);
+  padding: 0.75em;
+  border-radius: var(--radius-s);
+  overflow-x: auto;
+}
+
+.hermine-settings-usage code {
+  font-size: var(--font-ui-smaller);
+}
+
+.hermine-settings-usage h4 {
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+}
+
+.hermine-settings-usage ul {
+  padding-left: 1.5em;
+}
+
+.hermine-settings-usage li {
+  margin: 0.25em 0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .hermine-table,
+  .hermine-matrix {
+    font-size: var(--font-ui-smaller);
+  }
+
+  .hermine-table th,
+  .hermine-table td,
+  .hermine-matrix th,
+  .hermine-matrix td {
+    padding: 0.375em 0.5em;
+  }
+
+  .hermine-editable-wrapper {
+    flex-wrap: wrap;
+  }
+
+  .hermine-value-input {
+    width: 100%;
+    min-width: auto;
+  }
+
+  .hermine-dot {
+    width: 16px;
+    height: 16px;
+  }
+
+  .hermine-preview {
+    width: 300px;
+    max-height: 250px;
+  }
+
+  /* Board responsive */
+  .hermine-board {
+    gap: 6px;
+    padding: 6px;
+  }
+
+  .hermine-board-cell {
+    min-width: 120px;
+    min-height: 80px;
+    padding: 6px;
+  }
+
+  .hermine-board-header-x,
+  .hermine-board-header-y {
+    padding: 8px 10px;
+    font-size: var(--font-ui-smaller);
+  }
+
+  .hermine-card-content {
+    padding: 6px 8px;
+  }
+
+  .hermine-card-title {
+    font-size: var(--font-ui-smaller);
+  }
+}
