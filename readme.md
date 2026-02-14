@@ -32,3 +32,9 @@ Eingabe	Erzeugte Werte
 Rot, Gelb, Grün	Rot, Gelb, Grün (wie bisher)
 
 
+source: "Projekte"
+x-achse: Status
+y-achse: Priorität
+hide-unassigned: true
+
+

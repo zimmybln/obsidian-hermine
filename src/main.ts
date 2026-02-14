@@ -57,9 +57,9 @@ export default class HerminePlugin extends Plugin {
       const config = parseHermineBlock(source);
 
       // Apply default sort if not specified
-      if (!config.sort) {
+      if (!config.sort && (config.xAxis || config.yAxis)) {
         config.sort = {
-          by: config.xAxis,
+          by: (config.xAxis || config.yAxis)!,
           order: this.settings.defaultSort
         };
       }

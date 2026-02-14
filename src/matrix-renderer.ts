@@ -3,6 +3,7 @@ import { HermineConfig, DocumentData, QueryResult } from "./types";
 import { FrontmatterUpdater } from "./frontmatter-updater";
 import { compileTransform, applyTransform, buildReverseMap } from "./value-transform";
 import { ValuePickerModal } from "./value-picker-modal";
+import { ExactValueModal } from "./exact-value-modal";
 
 /**
  * Renders the query results as an editable matrix/table with draggable dots
@@ -75,6 +76,11 @@ export class MatrixRenderer extends MarkdownRenderChild {
     this.containerEl.empty();
     this.containerEl.addClass("hermine-container");
 
+    // Apply theme class if configured
+    if (this.config.theme) {
+      this.containerEl.addClass(`hermine-theme-${this.config.theme}`);
+    }
+
     // Render title if configured
     if (this.config.title) {
       this.containerEl.createEl("h3", {
@@ -95,11 +101,11 @@ export class MatrixRenderer extends MarkdownRenderChild {
       return;
     }
 
-    // Render based on whether Y-axis is specified
-    if (this.config.yAxis) {
+    // Render based on axes specified
+    if (this.config.xAxis && this.config.yAxis) {
       this.renderMatrix();
     } else {
-      this.renderTable();
+      this.renderSingleAxisBoard();
     }
   }
 
@@ -137,7 +143,7 @@ export class MatrixRenderer extends MarkdownRenderChild {
     headerRow.createEl("th", { text: "Dokument" });
 
     // X-axis column
-    headerRow.createEl("th", { text: this.config.xAxis });
+    headerRow.createEl("th", { text: this.config.xAxis! });
 
     // Additional display columns
     if (this.config.display) {
@@ -164,9 +170,9 @@ export class MatrixRenderer extends MarkdownRenderChild {
       });
 
       // X-axis value (editable)
-      const xValue = this.getPropertyValue(doc.properties, this.config.xAxis);
+      const xValue = this.getPropertyValue(doc.properties, this.config.xAxis!);
       const xCell = row.createEl("td", { cls: "hermine-cell-editable" });
-      this.renderEditableCell(xCell, doc, this.config.xAxis, xValue);
+      this.renderEditableCell(xCell, doc, this.config.xAxis!, xValue);
 
       // Additional display columns (editable)
       if (this.config.display) {
@@ -253,20 +259,19 @@ export class MatrixRenderer extends MarkdownRenderChild {
         cell.dataset.yValue = String(yVal);
 
         // Setup drop zone
-        this.setupDropZone(cell, xVal, yVal);
+        this.setupDropZone(cell, xVal, yVal, xValues, yValues);
 
-        // Find documents matching this X/Y combination (transform-aware)
+        // Find documents matching this X/Y combination (transform- and exact-aware)
         const matchingDocs = this.result.documents.filter(doc => {
-          const rawX = this.getPropertyValue(doc.properties, this.config.xAxis);
+          const rawX = this.getPropertyValue(doc.properties, this.config.xAxis!);
           const rawY = this.getPropertyValue(doc.properties, this.config.yAxis!);
 
-          // Apply transforms for comparison
           const xMatch = Array.isArray(rawX)
-            ? rawX.some(v => String(applyTransform(v, this.xTransformFn)) === String(xVal))
-            : String(applyTransform(rawX, this.xTransformFn)) === String(xVal);
+            ? rawX.some(v => this.matchesCellValue(v, xVal, this.xTransformFn, !!this.config.xExact, xValues))
+            : this.matchesCellValue(rawX, xVal, this.xTransformFn, !!this.config.xExact, xValues);
           const yMatch = Array.isArray(rawY)
-            ? rawY.some(v => String(applyTransform(v, this.yTransformFn)) === String(yVal))
-            : String(applyTransform(rawY, this.yTransformFn)) === String(yVal);
+            ? rawY.some(v => this.matchesCellValue(v, yVal, this.yTransformFn, !!this.config.yExact, yValues))
+            : this.matchesCellValue(rawY, yVal, this.yTransformFn, !!this.config.yExact, yValues);
 
           return xMatch && yMatch;
         });
@@ -293,6 +298,132 @@ export class MatrixRenderer extends MarkdownRenderChild {
     this.renderUnassigned(xValues, yValues);
 
     // Refresh button
+    this.renderRefreshButton();
+  }
+
+  /**
+   * Render a single-axis board view (X-only or Y-only).
+   * Cards are stacked along the single axis.
+   */
+  private renderSingleAxisBoard(): void {
+    // Determine which axis is available
+    const isYOnly = !this.config.xAxis && !!this.config.yAxis;
+    const axisProperty = isYOnly ? this.config.yAxis! : this.config.xAxis!;
+    const axisValues = isYOnly
+      ? (this.config.yValues ? this.config.yValues : Array.from(this.result.yAxisValues).sort())
+      : (this.config.xValues ? this.config.xValues : Array.from(this.result.xAxisValues).sort());
+    const transformFn = isYOnly ? this.yTransformFn : this.xTransformFn;
+    const isExact = isYOnly ? !!this.config.yExact : !!this.config.xExact;
+    const axisLabel = isYOnly
+      ? (this.config.yLabel || this.config.xLabel)
+      : (this.config.xLabel || this.config.yLabel);
+
+    // Create layout wrapper
+    const boardLayout = this.containerEl.createDiv({ cls: "hermine-board-layout" });
+
+    // Create zoom wrapper
+    const zoomWrapper = boardLayout.createDiv({ cls: "hermine-zoom-wrapper" });
+
+    zoomWrapper.addEventListener("wheel", (e) => {
+      if (e.ctrlKey) {
+        e.preventDefault();
+        if (e.deltaY < 0) this.zoomIn();
+        else this.zoomOut();
+      }
+    }, { passive: false });
+
+    // Create board container
+    const board = zoomWrapper.createDiv({ cls: "hermine-board hermine-board-single-axis" });
+    this.boardEl = board;
+
+    if (isYOnly) {
+      // Y-only: vertical layout — header left, cell right per row
+      board.style.gridTemplateColumns = `auto 1fr`;
+
+      this.applyZoom();
+
+      for (const val of axisValues) {
+        // Y-header on the left
+        const header = board.createDiv({ cls: "hermine-board-header-y" });
+        header.createSpan({ text: String(val) });
+
+        // Cell on the right
+        const cell = board.createDiv({ cls: "hermine-board-cell hermine-board-cell-horizontal" });
+        cell.dataset.yValue = String(val);
+
+        this.setupDropZone(cell, undefined, val, [], axisValues);
+
+        const matchingDocs = this.result.documents.filter(doc => {
+          const raw = this.getPropertyValue(doc.properties, axisProperty);
+          return Array.isArray(raw)
+            ? raw.some(v => this.matchesCellValue(v, val, transformFn, isExact, axisValues))
+            : this.matchesCellValue(raw, val, transformFn, isExact, axisValues);
+        });
+
+        if (matchingDocs.length > 0) {
+          const items = cell.createDiv({ cls: "hermine-board-items hermine-board-items-horizontal" });
+          for (const doc of matchingDocs) {
+            this.renderDocumentCard(items, doc);
+          }
+        }
+      }
+
+      // Axis label below
+      if (axisLabel) {
+        const labelEl = board.createDiv({ cls: "hermine-axis-label-y-bottom" });
+        labelEl.style.gridColumn = "span 2";
+        labelEl.createSpan({ text: axisLabel });
+      }
+    } else {
+      // X-only: horizontal layout — columns
+      board.style.gridTemplateColumns = `repeat(${axisValues.length}, 1fr)`;
+
+      this.applyZoom();
+
+      // Header row
+      for (const val of axisValues) {
+        const header = board.createDiv({ cls: "hermine-board-header-x" });
+        header.createSpan({ text: String(val) });
+      }
+
+      // Single row of cells
+      for (const val of axisValues) {
+        const cell = board.createDiv({ cls: "hermine-board-cell" });
+        cell.dataset.xValue = String(val);
+
+        this.setupDropZone(cell, val, undefined, axisValues, []);
+
+        const matchingDocs = this.result.documents.filter(doc => {
+          const raw = this.getPropertyValue(doc.properties, axisProperty);
+          return Array.isArray(raw)
+            ? raw.some(v => this.matchesCellValue(v, val, transformFn, isExact, axisValues))
+            : this.matchesCellValue(raw, val, transformFn, isExact, axisValues);
+        });
+
+        if (matchingDocs.length > 0) {
+          const items = cell.createDiv({ cls: "hermine-board-items" });
+          for (const doc of matchingDocs) {
+            this.renderDocumentCard(items, doc);
+          }
+        }
+      }
+
+      // Axis label below
+      if (axisLabel) {
+        const labelEl = board.createDiv({ cls: "hermine-axis-label-x" });
+        labelEl.style.gridColumn = `span ${axisValues.length}`;
+        labelEl.createSpan({ text: axisLabel });
+      }
+    }
+
+    // Unassigned documents
+    if (isYOnly) {
+      this.renderUnassigned([], axisValues);
+    } else {
+      this.renderUnassigned(axisValues, []);
+    }
+
+    // Toolbar
     this.renderRefreshButton();
   }
 
@@ -327,8 +458,12 @@ export class MatrixRenderer extends MarkdownRenderChild {
     // Store document reference
     card.dataset.docPath = doc.path;
 
-    // Make draggable (unless both axes are readonly)
-    const fullyReadonly = this.config.xReadonly && this.config.yReadonly;
+    // Make draggable (unless all configured axes are readonly)
+    const hasX = !!this.config.xAxis;
+    const hasY = !!this.config.yAxis;
+    const fullyReadonly = (hasX && hasY)
+      ? (!!this.config.xReadonly && !!this.config.yReadonly)
+      : hasX ? !!this.config.xReadonly : !!this.config.yReadonly;
     card.draggable = !fullyReadonly;
     if (fullyReadonly) {
       card.style.cursor = "pointer";
@@ -342,11 +477,15 @@ export class MatrixRenderer extends MarkdownRenderChild {
       e.dataTransfer?.setData("text/plain", doc.path);
 
       // Determine the current cell position of this document
-      const docX = this.getPropertyValue(doc.properties, this.config.xAxis);
+      const docX = this.config.xAxis
+        ? this.getPropertyValue(doc.properties, this.config.xAxis)
+        : undefined;
       const docY = this.config.yAxis
         ? this.getPropertyValue(doc.properties, this.config.yAxis)
         : undefined;
-      const docXStr = String(applyTransform(docX, this.xTransformFn));
+      const docXStr = docX !== undefined
+        ? String(applyTransform(docX, this.xTransformFn))
+        : undefined;
       const docYStr = docY !== undefined
         ? String(applyTransform(docY, this.yTransformFn))
         : undefined;
@@ -472,7 +611,10 @@ export class MatrixRenderer extends MarkdownRenderChild {
   /**
    * Setup a cell as a drop zone
    */
-  private setupDropZone(cell: HTMLElement, xVal: any, yVal: any): void {
+  private setupDropZone(
+    cell: HTMLElement, xVal: any, yVal: any,
+    allXValues: any[], allYValues: any[]
+  ): void {
     cell.addEventListener("dragover", (e) => {
       // Only allow drop on reachable cells
       if (!cell.hasClass("hermine-drop-zone-active")) return;
@@ -495,22 +637,34 @@ export class MatrixRenderer extends MarkdownRenderChild {
       try {
         const updates: Record<string, any> = {};
 
-        // Only update X-axis if not readonly
-        if (!this.config.xReadonly) {
-          const xWriteValue = await this.resolveDropValue(
-            xVal, this.xTransformFn, this.xReverseMap, this.config.xAxis
-          );
-          if (xWriteValue === null) return; // User cancelled
-          updates[this.config.xAxis] = xWriteValue;
+        // Only update X-axis if it exists, has a value, and is not readonly
+        if (this.config.xAxis && xVal !== undefined && !this.config.xReadonly) {
+          if (this.config.xExact) {
+            const exactVal = await this.promptExactValue(this.config.xAxis, xVal, allXValues);
+            if (exactVal === null) return;
+            updates[this.config.xAxis] = exactVal;
+          } else {
+            const xWriteValue = await this.resolveDropValue(
+              xVal, this.xTransformFn, this.xReverseMap, this.config.xAxis
+            );
+            if (xWriteValue === null) return;
+            updates[this.config.xAxis] = xWriteValue;
+          }
         }
 
-        // Only update Y-axis if not readonly
-        if (!this.config.yReadonly) {
-          const yWriteValue = await this.resolveDropValue(
-            yVal, this.yTransformFn, this.yReverseMap, this.config.yAxis!
-          );
-          if (yWriteValue === null) return; // User cancelled
-          updates[this.config.yAxis!] = yWriteValue;
+        // Only update Y-axis if it exists and is not readonly
+        if (this.config.yAxis && yVal !== undefined && !this.config.yReadonly) {
+          if (this.config.yExact) {
+            const exactVal = await this.promptExactValue(this.config.yAxis!, yVal, allYValues);
+            if (exactVal === null) return;
+            updates[this.config.yAxis!] = exactVal;
+          } else {
+            const yWriteValue = await this.resolveDropValue(
+              yVal, this.yTransformFn, this.yReverseMap, this.config.yAxis!
+            );
+            if (yWriteValue === null) return;
+            updates[this.config.yAxis!] = yWriteValue;
+          }
         }
 
         if (Object.keys(updates).length === 0) return;
@@ -686,6 +840,101 @@ export class MatrixRenderer extends MarkdownRenderChild {
   }
 
   /**
+   * Check if a raw document value matches a cell value.
+   * In exact mode, numeric values are binned to the nearest step.
+   */
+  private matchesCellValue(
+    rawValue: any,
+    cellValue: any,
+    transformFn: ((v: any) => any) | null,
+    isExact: boolean,
+    allCellValues: any[]
+  ): boolean {
+    const transformed = applyTransform(rawValue, transformFn);
+
+    if (!isExact) {
+      return String(transformed) === String(cellValue);
+    }
+
+    // Exact mode: bin the numeric value to the correct step cell
+    const numVal = parseFloat(String(transformed));
+    const numCell = parseFloat(String(cellValue));
+    if (isNaN(numVal) || isNaN(numCell)) {
+      return String(transformed) === String(cellValue);
+    }
+
+    const bin = this.findBinCell(numVal, allCellValues);
+    return bin !== null && String(bin) === String(cellValue);
+  }
+
+  /**
+   * Find which cell a numeric value belongs to (floor to nearest step).
+   * Works for both ascending and descending value lists.
+   */
+  private findBinCell(value: number, cellValues: any[]): number | null {
+    const nums = cellValues
+      .map(v => parseFloat(String(v)))
+      .filter(n => !isNaN(n))
+      .sort((a, b) => a - b);
+
+    if (nums.length === 0) return null;
+
+    // Find the largest step value that is <= the given value
+    let bin: number | null = null;
+    for (const cv of nums) {
+      if (cv <= value) bin = cv;
+      else break;
+    }
+
+    // If value is below all steps, assign to the first (smallest) step
+    if (bin === null) bin = nums[0];
+
+    return bin;
+  }
+
+  /**
+   * Get the range boundaries for a cell in exact mode.
+   * Returns [min, max] for the valid input range.
+   */
+  private getCellRange(cellValue: any, allCellValues: any[]): [number, number] {
+    const nums = allCellValues
+      .map(v => parseFloat(String(v)))
+      .filter(n => !isNaN(n))
+      .sort((a, b) => a - b);
+
+    const numCell = parseFloat(String(cellValue));
+    const idx = nums.indexOf(numCell);
+
+    const min = numCell;
+    const max = idx + 1 < nums.length ? nums[idx + 1] - 1 : numCell;
+
+    return [Math.min(min, max), Math.max(min, max)];
+  }
+
+  /**
+   * Prompt the user for an exact value via modal.
+   * Returns null if cancelled.
+   */
+  private promptExactValue(
+    axisName: string,
+    cellValue: any,
+    allCellValues: any[]
+  ): Promise<number | null> {
+    return new Promise((resolve) => {
+      const [rangeMin, rangeMax] = this.getCellRange(cellValue, allCellValues);
+      const modal = new ExactValueModal(
+        this.app,
+        axisName,
+        parseFloat(String(cellValue)),
+        rangeMin,
+        rangeMax,
+        (value) => resolve(value)
+      );
+      modal.open();
+    });
+  }
+
+  /**
    * Evaluate the cardStyle function for a document.
    * Returns a normalized style object.
    *
@@ -744,28 +993,40 @@ export class MatrixRenderer extends MarkdownRenderChild {
    * Render unassigned documents that couldn't be placed in the matrix
    */
   private renderUnassigned(xValues: any[], yValues: any[]): void {
+    if (this.config.hideUnassigned) return;
+
+    const hasX = this.config.xAxis && xValues.length > 0;
+    const hasY = this.config.yAxis && yValues.length > 0;
+
     // Find documents that don't match any cell in the matrix
     const unassigned = this.result.documents.filter(doc => {
-      const rawX = this.getPropertyValue(doc.properties, this.config.xAxis);
-      const rawY = this.getPropertyValue(doc.properties, this.config.yAxis!);
-
-      if (rawX === undefined || rawX === null || rawX === "" ||
-          rawY === undefined || rawY === null || rawY === "") {
-        return true;
+      if (hasX) {
+        const rawX = this.getPropertyValue(doc.properties, this.config.xAxis!);
+        if (rawX === undefined || rawX === null || rawX === "") {
+          return true;
+        }
+        const xMatches = xValues.some(xVal =>
+          Array.isArray(rawX)
+            ? rawX.some(v => this.matchesCellValue(v, xVal, this.xTransformFn, !!this.config.xExact, xValues))
+            : this.matchesCellValue(rawX, xVal, this.xTransformFn, !!this.config.xExact, xValues)
+        );
+        if (!xMatches) return true;
       }
 
-      const xMatches = xValues.some(xVal =>
-        Array.isArray(rawX)
-          ? rawX.some(v => String(applyTransform(v, this.xTransformFn)) === String(xVal))
-          : String(applyTransform(rawX, this.xTransformFn)) === String(xVal)
-      );
-      const yMatches = yValues.some(yVal =>
-        Array.isArray(rawY)
-          ? rawY.some(v => String(applyTransform(v, this.yTransformFn)) === String(yVal))
-          : String(applyTransform(rawY, this.yTransformFn)) === String(yVal)
-      );
+      if (hasY) {
+        const rawY = this.getPropertyValue(doc.properties, this.config.yAxis!);
+        if (rawY === undefined || rawY === null || rawY === "") {
+          return true;
+        }
+        const yMatches = yValues.some(yVal =>
+          Array.isArray(rawY)
+            ? rawY.some(v => this.matchesCellValue(v, yVal, this.yTransformFn, !!this.config.yExact, yValues))
+            : this.matchesCellValue(rawY, yVal, this.yTransformFn, !!this.config.yExact, yValues)
+        );
+        if (!yMatches) return true;
+      }
 
-      return !xMatches || !yMatches;
+      return false;
     });
 
     if (unassigned.length === 0) return;
@@ -909,8 +1170,8 @@ export class MatrixRenderer extends MarkdownRenderChild {
   private renderRefreshButton(): void {
     const toolbar = this.containerEl.createDiv({ cls: "hermine-toolbar" });
 
-    // Only show zoom controls for matrix/board view
-    if (this.config.yAxis) {
+    // Show zoom controls for board views (both matrix and single-axis)
+    if (this.boardEl) {
       // Zoom controls container
       const zoomControls = toolbar.createDiv({ cls: "hermine-zoom-controls" });
 

@@ -30,7 +30,14 @@ function unclosedBraces(str: string): number {
  *   [1..5]             → ["1","2","3","4","5"]
  *   [-10..10, Step 5]  → ["-10","-5","0","5","10"]
  */
-function parseValueList(value: string): string[] {
+function parseAxisValues(value: string): { values: string[]; exact: boolean } {
+  // Detect and strip "exakt" / "exact" keyword
+  let exact = false;
+  if (/\bexakt\b/i.test(value) || /\bexact\b/i.test(value)) {
+    exact = true;
+    value = value.replace(/,?\s*exakt\b/i, "").replace(/,?\s*exact\b/i, "").trim();
+  }
+
   const rangeMatch = value.match(
     /^\[\s*(-?\d+(?:\.\d+)?)\s*\.\.\s*(-?\d+(?:\.\d+)?)\s*(?:,\s*[Ss]tep\s+(\d+(?:\.\d+)?))?\s*\]$/
   );
@@ -40,7 +47,7 @@ function parseValueList(value: string): string[] {
     const to = parseFloat(rangeMatch[2]);
     const step = rangeMatch[3] ? parseFloat(rangeMatch[3]) : 1;
 
-    if (step <= 0) return [String(from)];
+    if (step <= 0) return { values: [String(from)], exact };
 
     const values: string[] = [];
     if (from <= to) {
@@ -52,11 +59,14 @@ function parseValueList(value: string): string[] {
         values.push(String(Math.round(v * 1e9) / 1e9));
       }
     }
-    return values;
+    return { values, exact };
   }
 
   // Fallback: comma-separated list
-  return value.split(",").map(s => s.trim()).filter(s => s);
+  return {
+    values: value.split(",").map(s => s.trim()).filter(s => s),
+    exact
+  };
 }
 
 /**
@@ -113,13 +123,21 @@ export function parseHermineBlock(content: string): HermineConfig {
       case "x-values":
       case "xvalues":
       case "x-options":
-        config.xValues = parseValueList(value);
+        {
+          const xParsed = parseAxisValues(value);
+          config.xValues = xParsed.values;
+          if (xParsed.exact) config.xExact = true;
+        }
         break;
       case "y-werte":
       case "y-values":
       case "yvalues":
       case "y-options":
-        config.yValues = parseValueList(value);
+        {
+          const yParsed = parseAxisValues(value);
+          config.yValues = yParsed.values;
+          if (yParsed.exact) config.yExact = true;
+        }
         break;
       case "x-label":
       case "x-beschriftung":
@@ -140,6 +158,16 @@ export function parseHermineBlock(content: string): HermineConfig {
       case "y-gesperrt":
       case "yreadonly":
         config.yReadonly = value.toLowerCase() !== "false" && value !== "0";
+        break;
+      case "x-exakt":
+      case "x-exact":
+      case "xexact":
+        config.xExact = value.toLowerCase() !== "false" && value !== "0";
+        break;
+      case "y-exakt":
+      case "y-exact":
+      case "yexact":
+        config.yExact = value.toLowerCase() !== "false" && value !== "0";
         break;
       case "readonly":
       case "gesperrt":
@@ -183,6 +211,17 @@ export function parseHermineBlock(content: string): HermineConfig {
       case "filter":
         config.where = value;
         break;
+      case "theme":
+      case "thema":
+      case "design":
+        config.theme = value.toLowerCase();
+        break;
+      case "hide-unassigned":
+      case "unzugeordnete-ausblenden":
+      case "nicht-zugeordnet-ausblenden":
+      case "hideunassigned":
+        config.hideUnassigned = value.toLowerCase() !== "false" && value !== "0";
+        break;
     }
   }
 
@@ -190,8 +229,8 @@ export function parseHermineBlock(content: string): HermineConfig {
   if (!config.source) {
     throw new Error("Missing required field: source (Quelle)");
   }
-  if (!config.xAxis) {
-    throw new Error("Missing required field: x-axis (X-Achse)");
+  if (!config.xAxis && !config.yAxis) {
+    throw new Error("Mindestens eine Achse muss angegeben werden (X-Achse oder Y-Achse)");
   }
 
   return config as HermineConfig;

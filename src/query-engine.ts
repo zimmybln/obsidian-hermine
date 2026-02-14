@@ -45,16 +45,18 @@ export class QueryEngine {
           result.documents.push(docData);
 
           // Collect X-axis values (apply transform for grouping)
-          const xValue = this.getPropertyValue(docData.properties, config.xAxis);
-          if (xValue !== undefined && xValue !== null) {
-            if (Array.isArray(xValue)) {
-              xValue.forEach(v => {
-                xRawValues.push(v);
-                result.xAxisValues.add(applyTransform(v, xTransformFn));
-              });
-            } else {
-              xRawValues.push(xValue);
-              result.xAxisValues.add(applyTransform(xValue, xTransformFn));
+          if (config.xAxis) {
+            const xValue = this.getPropertyValue(docData.properties, config.xAxis);
+            if (xValue !== undefined && xValue !== null) {
+              if (Array.isArray(xValue)) {
+                xValue.forEach(v => {
+                  xRawValues.push(v);
+                  result.xAxisValues.add(applyTransform(v, xTransformFn));
+                });
+              } else {
+                xRawValues.push(xValue);
+                result.xAxisValues.add(applyTransform(xValue, xTransformFn));
+              }
             }
           }
 

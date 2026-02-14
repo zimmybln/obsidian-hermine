@@ -8,8 +8,8 @@ export interface HermineConfig {
   title?: string;
   /** Source query - folder path, tag, or special query like "all" */
   source: string;
-  /** Property name for X-axis values */
-  xAxis: string;
+  /** Property name for X-axis values (required unless yAxis is set) */
+  xAxis?: string;
   /** Property name for Y-axis values (optional) */
   yAxis?: string;
   /** Predefined values for X-axis (optional, defines order and available values) */
@@ -33,12 +33,20 @@ export interface HermineConfig {
   xReadonly?: boolean;
   /** Prevent dragging along the Y-axis */
   yReadonly?: boolean;
+  /** Allow exact (non-step) values when placing cards on the X-axis */
+  xExact?: boolean;
+  /** Allow exact (non-step) values when placing cards on the Y-axis */
+  yExact?: boolean;
   /** JavaScript arrow function to customize card appearance based on properties */
   cardStyle?: string;
   /** JavaScript arrow function to transform X-axis values for grouping */
   xTransform?: string;
   /** JavaScript arrow function to transform Y-axis values for grouping */
   yTransform?: string;
+  /** Visual theme name (e.g. "glass") applied as CSS class */
+  theme?: string;
+  /** Hide documents that are not assigned to any cell */
+  hideUnassigned?: boolean;
 }
 
 /**

@@ -27,7 +27,7 @@ __export(main_exports, {
   default: () => HerminePlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian4 = require("obsidian");
+var import_obsidian5 = require("obsidian");
 
 // src/parser.ts
 var FUNCTION_KEYS = /* @__PURE__ */ new Set([
@@ -53,7 +53,12 @@ function unclosedBraces(str) {
   }
   return depth;
 }
-function parseValueList(value) {
+function parseAxisValues(value) {
+  let exact = false;
+  if (/\bexakt\b/i.test(value) || /\bexact\b/i.test(value)) {
+    exact = true;
+    value = value.replace(/,?\s*exakt\b/i, "").replace(/,?\s*exact\b/i, "").trim();
+  }
   const rangeMatch = value.match(
     /^\[\s*(-?\d+(?:\.\d+)?)\s*\.\.\s*(-?\d+(?:\.\d+)?)\s*(?:,\s*[Ss]tep\s+(\d+(?:\.\d+)?))?\s*\]$/
   );
@@ -62,7 +67,7 @@ function parseValueList(value) {
     const to = parseFloat(rangeMatch[2]);
     const step = rangeMatch[3] ? parseFloat(rangeMatch[3]) : 1;
     if (step <= 0)
-      return [String(from)];
+      return { values: [String(from)], exact };
     const values = [];
     if (from <= to) {
       for (let v = from; v <= to + step * 1e-9; v += step) {
@@ -73,9 +78,12 @@ function parseValueList(value) {
         values.push(String(Math.round(v * 1e9) / 1e9));
       }
     }
-    return values;
+    return { values, exact };
   }
-  return value.split(",").map((s) => s.trim()).filter((s) => s);
+  return {
+    values: value.split(",").map((s) => s.trim()).filter((s) => s),
+    exact
+  };
 }
 function parseHermineBlock(content) {
   var _a;
@@ -124,13 +132,23 @@ function parseHermineBlock(content) {
       case "x-values":
       case "xvalues":
       case "x-options":
-        config.xValues = parseValueList(value);
+        {
+          const xParsed = parseAxisValues(value);
+          config.xValues = xParsed.values;
+          if (xParsed.exact)
+            config.xExact = true;
+        }
         break;
       case "y-werte":
       case "y-values":
       case "yvalues":
       case "y-options":
-        config.yValues = parseValueList(value);
+        {
+          const yParsed = parseAxisValues(value);
+          config.yValues = yParsed.values;
+          if (yParsed.exact)
+            config.yExact = true;
+        }
         break;
       case "x-label":
       case "x-beschriftung":
@@ -151,6 +169,16 @@ function parseHermineBlock(content) {
       case "y-gesperrt":
       case "yreadonly":
         config.yReadonly = value.toLowerCase() !== "false" && value !== "0";
+        break;
+      case "x-exakt":
+      case "x-exact":
+      case "xexact":
+        config.xExact = value.toLowerCase() !== "false" && value !== "0";
+        break;
+      case "y-exakt":
+      case "y-exact":
+      case "yexact":
+        config.yExact = value.toLowerCase() !== "false" && value !== "0";
         break;
       case "readonly":
       case "gesperrt":
@@ -194,13 +222,24 @@ function parseHermineBlock(content) {
       case "filter":
         config.where = value;
         break;
+      case "theme":
+      case "thema":
+      case "design":
+        config.theme = value.toLowerCase();
+        break;
+      case "hide-unassigned":
+      case "unzugeordnete-ausblenden":
+      case "nicht-zugeordnet-ausblenden":
+      case "hideunassigned":
+        config.hideUnassigned = value.toLowerCase() !== "false" && value !== "0";
+        break;
     }
   }
   if (!config.source) {
     throw new Error("Missing required field: source (Quelle)");
   }
-  if (!config.xAxis) {
-    throw new Error("Missing required field: x-axis (X-Achse)");
+  if (!config.xAxis && !config.yAxis) {
+    throw new Error("Mindestens eine Achse muss angegeben werden (X-Achse oder Y-Achse)");
   }
   return config;
 }
@@ -280,16 +319,18 @@ var QueryEngine = class {
             continue;
           }
           result.documents.push(docData);
-          const xValue = this.getPropertyValue(docData.properties, config.xAxis);
-          if (xValue !== void 0 && xValue !== null) {
-            if (Array.isArray(xValue)) {
-              xValue.forEach((v) => {
-                xRawValues.push(v);
-                result.xAxisValues.add(applyTransform(v, xTransformFn));
-              });
-            } else {
-              xRawValues.push(xValue);
-              result.xAxisValues.add(applyTransform(xValue, xTransformFn));
+          if (config.xAxis) {
+            const xValue = this.getPropertyValue(docData.properties, config.xAxis);
+            if (xValue !== void 0 && xValue !== null) {
+              if (Array.isArray(xValue)) {
+                xValue.forEach((v) => {
+                  xRawValues.push(v);
+                  result.xAxisValues.add(applyTransform(v, xTransformFn));
+                });
+              } else {
+                xRawValues.push(xValue);
+                result.xAxisValues.add(applyTransform(xValue, xTransformFn));
+              }
             }
           }
           if (config.yAxis) {
@@ -450,7 +491,7 @@ var QueryEngine = class {
 };
 
 // src/matrix-renderer.ts
-var import_obsidian3 = require("obsidian");
+var import_obsidian4 = require("obsidian");
 
 // src/frontmatter-updater.ts
 var FrontmatterUpdater = class {
@@ -728,8 +769,108 @@ var ValuePickerModal = class extends import_obsidian2.Modal {
   }
 };
 
+// src/exact-value-modal.ts
+var import_obsidian3 = require("obsidian");
+var ExactValueModal = class extends import_obsidian3.Modal {
+  constructor(app, axisName, cellValue, rangeMin, rangeMax, onChoose) {
+    super(app);
+    this.axisName = axisName;
+    this.cellValue = cellValue;
+    this.rangeMin = rangeMin;
+    this.rangeMax = rangeMax;
+    this.onChoose = onChoose;
+    this.resolved = false;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.addClass("hermine-exact-modal");
+    contentEl.createEl("h3", {
+      text: `Exakter Wert f\xFCr "${this.axisName}"`
+    });
+    contentEl.createEl("p", {
+      cls: "hermine-exact-info",
+      text: `Bereich: ${this.rangeMin} \u2013 ${this.rangeMax}`
+    });
+    const inputRow = contentEl.createDiv({ cls: "hermine-exact-input-row" });
+    const input = inputRow.createEl("input", {
+      cls: "hermine-exact-input",
+      type: "number"
+    });
+    input.min = String(this.rangeMin);
+    input.max = String(this.rangeMax);
+    input.value = String(this.cellValue);
+    input.step = "1";
+    const slider = inputRow.createEl("input", {
+      cls: "hermine-exact-slider",
+      type: "range"
+    });
+    slider.min = String(this.rangeMin);
+    slider.max = String(this.rangeMax);
+    slider.value = String(this.cellValue);
+    slider.step = "1";
+    input.addEventListener("input", () => {
+      slider.value = input.value;
+      updateValidation();
+    });
+    slider.addEventListener("input", () => {
+      input.value = slider.value;
+      updateValidation();
+    });
+    const validation = contentEl.createDiv({ cls: "hermine-exact-validation" });
+    const updateValidation = () => {
+      const num = parseFloat(input.value);
+      if (isNaN(num)) {
+        validation.textContent = "Bitte eine Zahl eingeben";
+        validation.className = "hermine-exact-validation hermine-picker-invalid";
+        confirmBtn.disabled = true;
+      } else if (num < this.rangeMin || num > this.rangeMax) {
+        validation.textContent = `Wert muss zwischen ${this.rangeMin} und ${this.rangeMax} liegen`;
+        validation.className = "hermine-exact-validation hermine-picker-invalid";
+        confirmBtn.disabled = true;
+      } else {
+        validation.textContent = `Wert: ${num}`;
+        validation.className = "hermine-exact-validation hermine-picker-valid";
+        confirmBtn.disabled = false;
+      }
+    };
+    const buttonContainer = contentEl.createDiv({ cls: "hermine-picker-buttons" });
+    const confirmBtn = buttonContainer.createEl("button", {
+      cls: "hermine-picker-confirm mod-cta",
+      text: "\xDCbernehmen"
+    });
+    const cancelBtn = buttonContainer.createEl("button", {
+      cls: "hermine-picker-cancel",
+      text: "Abbrechen"
+    });
+    const confirm = () => {
+      if (confirmBtn.disabled)
+        return;
+      this.resolved = true;
+      this.onChoose(parseFloat(input.value));
+      this.close();
+    };
+    confirmBtn.addEventListener("click", confirm);
+    cancelBtn.addEventListener("click", () => this.close());
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter")
+        confirm();
+      else if (e.key === "Escape")
+        this.close();
+    });
+    input.focus();
+    input.select();
+    updateValidation();
+  }
+  onClose() {
+    if (!this.resolved) {
+      this.onChoose(null);
+    }
+    this.contentEl.empty();
+  }
+};
+
 // src/matrix-renderer.ts
-var _MatrixRenderer = class extends import_obsidian3.MarkdownRenderChild {
+var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
   constructor(containerEl, app, config, result, onRefresh) {
     super(containerEl);
     this.app = app;
@@ -778,6 +919,9 @@ var _MatrixRenderer = class extends import_obsidian3.MarkdownRenderChild {
   render() {
     this.containerEl.empty();
     this.containerEl.addClass("hermine-container");
+    if (this.config.theme) {
+      this.containerEl.addClass(`hermine-theme-${this.config.theme}`);
+    }
     if (this.config.title) {
       this.containerEl.createEl("h3", {
         cls: "hermine-title",
@@ -792,10 +936,10 @@ var _MatrixRenderer = class extends import_obsidian3.MarkdownRenderChild {
       this.renderEmptyState();
       return;
     }
-    if (this.config.yAxis) {
+    if (this.config.xAxis && this.config.yAxis) {
       this.renderMatrix();
     } else {
-      this.renderTable();
+      this.renderSingleAxisBoard();
     }
   }
   /**
@@ -893,12 +1037,12 @@ var _MatrixRenderer = class extends import_obsidian3.MarkdownRenderChild {
         const cell = board.createDiv({ cls: "hermine-board-cell" });
         cell.dataset.xValue = String(xVal);
         cell.dataset.yValue = String(yVal);
-        this.setupDropZone(cell, xVal, yVal);
+        this.setupDropZone(cell, xVal, yVal, xValues, yValues);
         const matchingDocs = this.result.documents.filter((doc) => {
           const rawX = this.getPropertyValue(doc.properties, this.config.xAxis);
           const rawY = this.getPropertyValue(doc.properties, this.config.yAxis);
-          const xMatch = Array.isArray(rawX) ? rawX.some((v) => String(applyTransform(v, this.xTransformFn)) === String(xVal)) : String(applyTransform(rawX, this.xTransformFn)) === String(xVal);
-          const yMatch = Array.isArray(rawY) ? rawY.some((v) => String(applyTransform(v, this.yTransformFn)) === String(yVal)) : String(applyTransform(rawY, this.yTransformFn)) === String(yVal);
+          const xMatch = Array.isArray(rawX) ? rawX.some((v) => this.matchesCellValue(v, xVal, this.xTransformFn, !!this.config.xExact, xValues)) : this.matchesCellValue(rawX, xVal, this.xTransformFn, !!this.config.xExact, xValues);
+          const yMatch = Array.isArray(rawY) ? rawY.some((v) => this.matchesCellValue(v, yVal, this.yTransformFn, !!this.config.yExact, yValues)) : this.matchesCellValue(rawY, yVal, this.yTransformFn, !!this.config.yExact, yValues);
           return xMatch && yMatch;
         });
         if (matchingDocs.length > 0) {
@@ -916,6 +1060,90 @@ var _MatrixRenderer = class extends import_obsidian3.MarkdownRenderChild {
       xLabelEl.createSpan({ text: this.config.xLabel });
     }
     this.renderUnassigned(xValues, yValues);
+    this.renderRefreshButton();
+  }
+  /**
+   * Render a single-axis board view (X-only or Y-only).
+   * Cards are stacked along the single axis.
+   */
+  renderSingleAxisBoard() {
+    const isYOnly = !this.config.xAxis && !!this.config.yAxis;
+    const axisProperty = isYOnly ? this.config.yAxis : this.config.xAxis;
+    const axisValues = isYOnly ? this.config.yValues ? this.config.yValues : Array.from(this.result.yAxisValues).sort() : this.config.xValues ? this.config.xValues : Array.from(this.result.xAxisValues).sort();
+    const transformFn = isYOnly ? this.yTransformFn : this.xTransformFn;
+    const isExact = isYOnly ? !!this.config.yExact : !!this.config.xExact;
+    const axisLabel = isYOnly ? this.config.yLabel || this.config.xLabel : this.config.xLabel || this.config.yLabel;
+    const boardLayout = this.containerEl.createDiv({ cls: "hermine-board-layout" });
+    const zoomWrapper = boardLayout.createDiv({ cls: "hermine-zoom-wrapper" });
+    zoomWrapper.addEventListener("wheel", (e) => {
+      if (e.ctrlKey) {
+        e.preventDefault();
+        if (e.deltaY < 0)
+          this.zoomIn();
+        else
+          this.zoomOut();
+      }
+    }, { passive: false });
+    const board = zoomWrapper.createDiv({ cls: "hermine-board hermine-board-single-axis" });
+    this.boardEl = board;
+    if (isYOnly) {
+      board.style.gridTemplateColumns = `auto 1fr`;
+      this.applyZoom();
+      for (const val of axisValues) {
+        const header = board.createDiv({ cls: "hermine-board-header-y" });
+        header.createSpan({ text: String(val) });
+        const cell = board.createDiv({ cls: "hermine-board-cell hermine-board-cell-horizontal" });
+        cell.dataset.yValue = String(val);
+        this.setupDropZone(cell, void 0, val, [], axisValues);
+        const matchingDocs = this.result.documents.filter((doc) => {
+          const raw = this.getPropertyValue(doc.properties, axisProperty);
+          return Array.isArray(raw) ? raw.some((v) => this.matchesCellValue(v, val, transformFn, isExact, axisValues)) : this.matchesCellValue(raw, val, transformFn, isExact, axisValues);
+        });
+        if (matchingDocs.length > 0) {
+          const items = cell.createDiv({ cls: "hermine-board-items hermine-board-items-horizontal" });
+          for (const doc of matchingDocs) {
+            this.renderDocumentCard(items, doc);
+          }
+        }
+      }
+      if (axisLabel) {
+        const labelEl = board.createDiv({ cls: "hermine-axis-label-y-bottom" });
+        labelEl.style.gridColumn = "span 2";
+        labelEl.createSpan({ text: axisLabel });
+      }
+    } else {
+      board.style.gridTemplateColumns = `repeat(${axisValues.length}, 1fr)`;
+      this.applyZoom();
+      for (const val of axisValues) {
+        const header = board.createDiv({ cls: "hermine-board-header-x" });
+        header.createSpan({ text: String(val) });
+      }
+      for (const val of axisValues) {
+        const cell = board.createDiv({ cls: "hermine-board-cell" });
+        cell.dataset.xValue = String(val);
+        this.setupDropZone(cell, val, void 0, axisValues, []);
+        const matchingDocs = this.result.documents.filter((doc) => {
+          const raw = this.getPropertyValue(doc.properties, axisProperty);
+          return Array.isArray(raw) ? raw.some((v) => this.matchesCellValue(v, val, transformFn, isExact, axisValues)) : this.matchesCellValue(raw, val, transformFn, isExact, axisValues);
+        });
+        if (matchingDocs.length > 0) {
+          const items = cell.createDiv({ cls: "hermine-board-items" });
+          for (const doc of matchingDocs) {
+            this.renderDocumentCard(items, doc);
+          }
+        }
+      }
+      if (axisLabel) {
+        const labelEl = board.createDiv({ cls: "hermine-axis-label-x" });
+        labelEl.style.gridColumn = `span ${axisValues.length}`;
+        labelEl.createSpan({ text: axisLabel });
+      }
+    }
+    if (isYOnly) {
+      this.renderUnassigned([], axisValues);
+    } else {
+      this.renderUnassigned(axisValues, []);
+    }
     this.renderRefreshButton();
   }
   /**
@@ -938,7 +1166,9 @@ var _MatrixRenderer = class extends import_obsidian3.MarkdownRenderChild {
       titleSpan.style.color = cardStyle.textColor;
     }
     card.dataset.docPath = doc.path;
-    const fullyReadonly = this.config.xReadonly && this.config.yReadonly;
+    const hasX = !!this.config.xAxis;
+    const hasY = !!this.config.yAxis;
+    const fullyReadonly = hasX && hasY ? !!this.config.xReadonly && !!this.config.yReadonly : hasX ? !!this.config.xReadonly : !!this.config.yReadonly;
     card.draggable = !fullyReadonly;
     if (fullyReadonly) {
       card.style.cursor = "pointer";
@@ -952,9 +1182,9 @@ var _MatrixRenderer = class extends import_obsidian3.MarkdownRenderChild {
       this.currentDragDoc = doc;
       card.addClass("hermine-card-dragging");
       (_a = e.dataTransfer) == null ? void 0 : _a.setData("text/plain", doc.path);
-      const docX = this.getPropertyValue(doc.properties, this.config.xAxis);
+      const docX = this.config.xAxis ? this.getPropertyValue(doc.properties, this.config.xAxis) : void 0;
       const docY = this.config.yAxis ? this.getPropertyValue(doc.properties, this.config.yAxis) : void 0;
-      const docXStr = String(applyTransform(docX, this.xTransformFn));
+      const docXStr = docX !== void 0 ? String(applyTransform(docX, this.xTransformFn)) : void 0;
       const docYStr = docY !== void 0 ? String(applyTransform(docY, this.yTransformFn)) : void 0;
       this.containerEl.querySelectorAll(".hermine-board-cell").forEach((cell) => {
         const el = cell;
@@ -1038,7 +1268,7 @@ var _MatrixRenderer = class extends import_obsidian3.MarkdownRenderChild {
   /**
    * Setup a cell as a drop zone
    */
-  setupDropZone(cell, xVal, yVal) {
+  setupDropZone(cell, xVal, yVal, allXValues, allYValues) {
     cell.addEventListener("dragover", (e) => {
       if (!cell.hasClass("hermine-drop-zone-active"))
         return;
@@ -1058,27 +1288,41 @@ var _MatrixRenderer = class extends import_obsidian3.MarkdownRenderChild {
       const doc = this.currentDragDoc;
       try {
         const updates = {};
-        if (!this.config.xReadonly) {
-          const xWriteValue = await this.resolveDropValue(
-            xVal,
-            this.xTransformFn,
-            this.xReverseMap,
-            this.config.xAxis
-          );
-          if (xWriteValue === null)
-            return;
-          updates[this.config.xAxis] = xWriteValue;
+        if (this.config.xAxis && xVal !== void 0 && !this.config.xReadonly) {
+          if (this.config.xExact) {
+            const exactVal = await this.promptExactValue(this.config.xAxis, xVal, allXValues);
+            if (exactVal === null)
+              return;
+            updates[this.config.xAxis] = exactVal;
+          } else {
+            const xWriteValue = await this.resolveDropValue(
+              xVal,
+              this.xTransformFn,
+              this.xReverseMap,
+              this.config.xAxis
+            );
+            if (xWriteValue === null)
+              return;
+            updates[this.config.xAxis] = xWriteValue;
+          }
         }
-        if (!this.config.yReadonly) {
-          const yWriteValue = await this.resolveDropValue(
-            yVal,
-            this.yTransformFn,
-            this.yReverseMap,
-            this.config.yAxis
-          );
-          if (yWriteValue === null)
-            return;
-          updates[this.config.yAxis] = yWriteValue;
+        if (this.config.yAxis && yVal !== void 0 && !this.config.yReadonly) {
+          if (this.config.yExact) {
+            const exactVal = await this.promptExactValue(this.config.yAxis, yVal, allYValues);
+            if (exactVal === null)
+              return;
+            updates[this.config.yAxis] = exactVal;
+          } else {
+            const yWriteValue = await this.resolveDropValue(
+              yVal,
+              this.yTransformFn,
+              this.yReverseMap,
+              this.config.yAxis
+            );
+            if (yWriteValue === null)
+              return;
+            updates[this.config.yAxis] = yWriteValue;
+          }
         }
         if (Object.keys(updates).length === 0)
           return;
@@ -1159,12 +1403,12 @@ var _MatrixRenderer = class extends import_obsidian3.MarkdownRenderChild {
       const contentWithoutFrontmatter = fileContent.replace(/^---[\s\S]*?---\n?/, "");
       const previewContent = contentWithoutFrontmatter.slice(0, 1e3);
       const truncated = contentWithoutFrontmatter.length > 1e3;
-      await import_obsidian3.MarkdownRenderer.render(
+      await import_obsidian4.MarkdownRenderer.render(
         this.app,
         previewContent + (truncated ? "\n\n*...*" : ""),
         content,
         doc.path,
-        new import_obsidian3.Component()
+        new import_obsidian4.Component()
       );
     } catch (error) {
       content.createSpan({ text: "Vorschau nicht verf\xFCgbar", cls: "hermine-preview-error" });
@@ -1207,6 +1451,72 @@ var _MatrixRenderer = class extends import_obsidian3.MarkdownRenderChild {
       this.previewEl.remove();
       this.previewEl = null;
     }
+  }
+  /**
+   * Check if a raw document value matches a cell value.
+   * In exact mode, numeric values are binned to the nearest step.
+   */
+  matchesCellValue(rawValue, cellValue, transformFn, isExact, allCellValues) {
+    const transformed = applyTransform(rawValue, transformFn);
+    if (!isExact) {
+      return String(transformed) === String(cellValue);
+    }
+    const numVal = parseFloat(String(transformed));
+    const numCell = parseFloat(String(cellValue));
+    if (isNaN(numVal) || isNaN(numCell)) {
+      return String(transformed) === String(cellValue);
+    }
+    const bin = this.findBinCell(numVal, allCellValues);
+    return bin !== null && String(bin) === String(cellValue);
+  }
+  /**
+   * Find which cell a numeric value belongs to (floor to nearest step).
+   * Works for both ascending and descending value lists.
+   */
+  findBinCell(value, cellValues) {
+    const nums = cellValues.map((v) => parseFloat(String(v))).filter((n) => !isNaN(n)).sort((a, b) => a - b);
+    if (nums.length === 0)
+      return null;
+    let bin = null;
+    for (const cv of nums) {
+      if (cv <= value)
+        bin = cv;
+      else
+        break;
+    }
+    if (bin === null)
+      bin = nums[0];
+    return bin;
+  }
+  /**
+   * Get the range boundaries for a cell in exact mode.
+   * Returns [min, max] for the valid input range.
+   */
+  getCellRange(cellValue, allCellValues) {
+    const nums = allCellValues.map((v) => parseFloat(String(v))).filter((n) => !isNaN(n)).sort((a, b) => a - b);
+    const numCell = parseFloat(String(cellValue));
+    const idx = nums.indexOf(numCell);
+    const min = numCell;
+    const max = idx + 1 < nums.length ? nums[idx + 1] - 1 : numCell;
+    return [Math.min(min, max), Math.max(min, max)];
+  }
+  /**
+   * Prompt the user for an exact value via modal.
+   * Returns null if cancelled.
+   */
+  promptExactValue(axisName, cellValue, allCellValues) {
+    return new Promise((resolve) => {
+      const [rangeMin, rangeMax] = this.getCellRange(cellValue, allCellValues);
+      const modal = new ExactValueModal(
+        this.app,
+        axisName,
+        parseFloat(String(cellValue)),
+        rangeMin,
+        rangeMax,
+        (value) => resolve(value)
+      );
+      modal.open();
+    });
   }
   /**
    * Evaluate the cardStyle function for a document.
@@ -1256,19 +1566,34 @@ var _MatrixRenderer = class extends import_obsidian3.MarkdownRenderChild {
    * Render unassigned documents that couldn't be placed in the matrix
    */
   renderUnassigned(xValues, yValues) {
+    if (this.config.hideUnassigned)
+      return;
+    const hasX = this.config.xAxis && xValues.length > 0;
+    const hasY = this.config.yAxis && yValues.length > 0;
     const unassigned = this.result.documents.filter((doc) => {
-      const rawX = this.getPropertyValue(doc.properties, this.config.xAxis);
-      const rawY = this.getPropertyValue(doc.properties, this.config.yAxis);
-      if (rawX === void 0 || rawX === null || rawX === "" || rawY === void 0 || rawY === null || rawY === "") {
-        return true;
+      if (hasX) {
+        const rawX = this.getPropertyValue(doc.properties, this.config.xAxis);
+        if (rawX === void 0 || rawX === null || rawX === "") {
+          return true;
+        }
+        const xMatches = xValues.some(
+          (xVal) => Array.isArray(rawX) ? rawX.some((v) => this.matchesCellValue(v, xVal, this.xTransformFn, !!this.config.xExact, xValues)) : this.matchesCellValue(rawX, xVal, this.xTransformFn, !!this.config.xExact, xValues)
+        );
+        if (!xMatches)
+          return true;
       }
-      const xMatches = xValues.some(
-        (xVal) => Array.isArray(rawX) ? rawX.some((v) => String(applyTransform(v, this.xTransformFn)) === String(xVal)) : String(applyTransform(rawX, this.xTransformFn)) === String(xVal)
-      );
-      const yMatches = yValues.some(
-        (yVal) => Array.isArray(rawY) ? rawY.some((v) => String(applyTransform(v, this.yTransformFn)) === String(yVal)) : String(applyTransform(rawY, this.yTransformFn)) === String(yVal)
-      );
-      return !xMatches || !yMatches;
+      if (hasY) {
+        const rawY = this.getPropertyValue(doc.properties, this.config.yAxis);
+        if (rawY === void 0 || rawY === null || rawY === "") {
+          return true;
+        }
+        const yMatches = yValues.some(
+          (yVal) => Array.isArray(rawY) ? rawY.some((v) => this.matchesCellValue(v, yVal, this.yTransformFn, !!this.config.yExact, yValues)) : this.matchesCellValue(rawY, yVal, this.yTransformFn, !!this.config.yExact, yValues)
+        );
+        if (!yMatches)
+          return true;
+      }
+      return false;
     });
     if (unassigned.length === 0)
       return;
@@ -1303,14 +1628,14 @@ var _MatrixRenderer = class extends import_obsidian3.MarkdownRenderChild {
       wrapper.insertBefore(label, display);
     }
     const editBtn = wrapper.createEl("button", { cls: "hermine-edit-btn" });
-    (0, import_obsidian3.setIcon)(editBtn, "pencil");
+    (0, import_obsidian4.setIcon)(editBtn, "pencil");
     editBtn.title = "Bearbeiten";
     const saveBtn = wrapper.createEl("button", { cls: "hermine-save-btn" });
-    (0, import_obsidian3.setIcon)(saveBtn, "check");
+    (0, import_obsidian4.setIcon)(saveBtn, "check");
     saveBtn.title = "Speichern";
     saveBtn.style.display = "none";
     const cancelBtn = wrapper.createEl("button", { cls: "hermine-cancel-btn" });
-    (0, import_obsidian3.setIcon)(cancelBtn, "x");
+    (0, import_obsidian4.setIcon)(cancelBtn, "x");
     cancelBtn.title = "Abbrechen";
     cancelBtn.style.display = "none";
     const enterEditMode = () => {
@@ -1372,10 +1697,10 @@ var _MatrixRenderer = class extends import_obsidian3.MarkdownRenderChild {
    */
   renderRefreshButton() {
     const toolbar = this.containerEl.createDiv({ cls: "hermine-toolbar" });
-    if (this.config.yAxis) {
+    if (this.boardEl) {
       const zoomControls = toolbar.createDiv({ cls: "hermine-zoom-controls" });
       const zoomOutBtn = zoomControls.createEl("button", { cls: "hermine-zoom-btn" });
-      (0, import_obsidian3.setIcon)(zoomOutBtn, "minus");
+      (0, import_obsidian4.setIcon)(zoomOutBtn, "minus");
       zoomOutBtn.title = "Verkleinern";
       zoomOutBtn.addEventListener("click", () => this.zoomOut());
       this.zoomDisplay = zoomControls.createEl("button", {
@@ -1385,7 +1710,7 @@ var _MatrixRenderer = class extends import_obsidian3.MarkdownRenderChild {
       this.zoomDisplay.title = "Zoom zur\xFCcksetzen";
       this.zoomDisplay.addEventListener("click", () => this.resetZoom());
       const zoomInBtn = zoomControls.createEl("button", { cls: "hermine-zoom-btn" });
-      (0, import_obsidian3.setIcon)(zoomInBtn, "plus");
+      (0, import_obsidian4.setIcon)(zoomInBtn, "plus");
       zoomInBtn.title = "Vergr\xF6\xDFern";
       zoomInBtn.addEventListener("click", () => this.zoomIn());
       const slider = zoomControls.createEl("input", {
@@ -1406,7 +1731,7 @@ var _MatrixRenderer = class extends import_obsidian3.MarkdownRenderChild {
       cls: "hermine-refresh-btn",
       text: "Aktualisieren"
     });
-    (0, import_obsidian3.setIcon)(refreshBtn, "refresh-cw");
+    (0, import_obsidian4.setIcon)(refreshBtn, "refresh-cw");
     refreshBtn.addEventListener("click", () => this.onRefresh());
   }
   /**
@@ -1492,7 +1817,7 @@ var DEFAULT_SETTINGS = {
   refreshOnChange: true,
   defaultSort: "asc"
 };
-var HerminePlugin = class extends import_obsidian4.Plugin {
+var HerminePlugin = class extends import_obsidian5.Plugin {
   async onload() {
     await this.loadSettings();
     this.queryEngine = new QueryEngine(this.app);
@@ -1515,9 +1840,9 @@ var HerminePlugin = class extends import_obsidian4.Plugin {
   async processHermineBlock(source, el, ctx) {
     try {
       const config = parseHermineBlock(source);
-      if (!config.sort) {
+      if (!config.sort && (config.xAxis || config.yAxis)) {
         config.sort = {
-          by: config.xAxis,
+          by: config.xAxis || config.yAxis,
           order: this.settings.defaultSort
         };
       }
@@ -1538,7 +1863,7 @@ var HerminePlugin = class extends import_obsidian4.Plugin {
     }
   }
 };
-var HermineSettingTab = class extends import_obsidian4.PluginSettingTab {
+var HermineSettingTab = class extends import_obsidian5.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -1547,11 +1872,11 @@ var HermineSettingTab = class extends import_obsidian4.PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     containerEl.createEl("h2", { text: "Hermine Einstellungen" });
-    new import_obsidian4.Setting(containerEl).setName("Automatisch aktualisieren").setDesc("Aktualisiert die Ansicht automatisch, wenn Dokumente ge\xE4ndert werden").addToggle((toggle) => toggle.setValue(this.plugin.settings.refreshOnChange).onChange(async (value) => {
+    new import_obsidian5.Setting(containerEl).setName("Automatisch aktualisieren").setDesc("Aktualisiert die Ansicht automatisch, wenn Dokumente ge\xE4ndert werden").addToggle((toggle) => toggle.setValue(this.plugin.settings.refreshOnChange).onChange(async (value) => {
       this.plugin.settings.refreshOnChange = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian4.Setting(containerEl).setName("Standard-Sortierung").setDesc("Standard-Sortierrichtung f\xFCr Abfragen").addDropdown((dropdown) => dropdown.addOption("asc", "Aufsteigend").addOption("desc", "Absteigend").setValue(this.plugin.settings.defaultSort).onChange(async (value) => {
+    new import_obsidian5.Setting(containerEl).setName("Standard-Sortierung").setDesc("Standard-Sortierrichtung f\xFCr Abfragen").addDropdown((dropdown) => dropdown.addOption("asc", "Aufsteigend").addOption("desc", "Absteigend").setValue(this.plugin.settings.defaultSort).onChange(async (value) => {
       this.plugin.settings.defaultSort = value;
       await this.plugin.saveSettings();
     }));
