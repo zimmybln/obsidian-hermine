@@ -47,6 +47,8 @@ export interface HermineConfig {
   theme?: string;
   /** Hide documents that are not assigned to any cell */
   hideUnassigned?: boolean;
+  /** JavaScript arrow function to filter documents: (docs) => docs.filter(...) */
+  filter?: string;
 }
 
 /**

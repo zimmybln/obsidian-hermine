@@ -219,8 +219,11 @@ function parseHermineBlock(content) {
         };
         break;
       case "where":
-      case "filter":
         config.where = value;
+        break;
+      case "filter":
+      case "filtern":
+        config.filter = value;
         break;
       case "theme":
       case "thema":
@@ -347,6 +350,51 @@ var QueryEngine = class {
               }
             }
           }
+        }
+      }
+      if (config.filter) {
+        try {
+          const filterFn = new Function("docs", `return (${config.filter})(docs)`);
+          const filtered = filterFn(result.documents);
+          if (Array.isArray(filtered)) {
+            result.documents = filtered;
+            result.xAxisValues.clear();
+            result.yAxisValues.clear();
+            xRawValues.length = 0;
+            yRawValues.length = 0;
+            for (const doc of result.documents) {
+              if (config.xAxis) {
+                const xValue = this.getPropertyValue(doc.properties, config.xAxis);
+                if (xValue !== void 0 && xValue !== null) {
+                  if (Array.isArray(xValue)) {
+                    xValue.forEach((v) => {
+                      xRawValues.push(v);
+                      result.xAxisValues.add(applyTransform(v, xTransformFn));
+                    });
+                  } else {
+                    xRawValues.push(xValue);
+                    result.xAxisValues.add(applyTransform(xValue, xTransformFn));
+                  }
+                }
+              }
+              if (config.yAxis) {
+                const yValue = this.getPropertyValue(doc.properties, config.yAxis);
+                if (yValue !== void 0 && yValue !== null) {
+                  if (Array.isArray(yValue)) {
+                    yValue.forEach((v) => {
+                      yRawValues.push(v);
+                      result.yAxisValues.add(applyTransform(v, yTransformFn));
+                    });
+                  } else {
+                    yRawValues.push(yValue);
+                    result.yAxisValues.add(applyTransform(yValue, yTransformFn));
+                  }
+                }
+              }
+            }
+          }
+        } catch (e) {
+          result.errors.push(`Filter error: ${e.message}`);
         }
       }
       result.xAxisRawValues = xRawValues;

@@ -208,8 +208,11 @@ export function parseHermineBlock(content: string): HermineConfig {
         };
         break;
       case "where":
-      case "filter":
         config.where = value;
+        break;
+      case "filter":
+      case "filtern":
+        config.filter = value;
         break;
       case "theme":
       case "thema":

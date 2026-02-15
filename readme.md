@@ -37,4 +37,19 @@ x-achse: Status
 y-achse: Priorität
 hide-unassigned: true
 
+Verwendung:
 
+Die filter-Option erhält ein Array aller Dokumente. Jedes Dokument hat eine properties-Map mit allen Frontmatter-Eigenschaften — unabhängig davon, ob sie auf einer Achse angezeigt werden.
+
+
+source: Projekte
+x-achse: Status
+y-achse: Priorität
+filter: (docs) => docs.filter(d => d.properties.aktiv === true)
+Weitere Beispiele:
+
+
+filter: (docs) => docs.filter(d => d.properties.punkte > 10)
+
+filter: (docs) => docs.filter(d => d.name.startsWith("2024"))
+Jedes Dokument-Objekt hat folgende Felder: file (TFile), path, name und properties (alle Frontmatter-Eigenschaften als Key-Value-Paare).
