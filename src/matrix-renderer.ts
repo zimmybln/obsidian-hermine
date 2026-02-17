@@ -16,6 +16,16 @@ export class MatrixRenderer extends MarkdownRenderChild {
   private zoomLevel: number = 100;
   private boardEl: HTMLElement | null = null;
   private zoomDisplay: HTMLElement | null = null;
+  private resizeState: {
+    doc: DocumentData;
+    edge: "start" | "end";
+    axis: "x" | "y";
+    cardEl: HTMLElement;
+    allValues: any[];
+    cellPositions: { value: any; start: number; end: number }[];
+    boardRect: DOMRect;
+    scale: number;
+  } | null = null;
 
   // Transform support
   private xTransformFn: ((v: any) => any) | null = null;
@@ -249,15 +259,28 @@ export class MatrixRenderer extends MarkdownRenderChild {
       xHeader.createSpan({ text: String(xVal) });
     }
 
+    // Separate range docs from point docs
+    const hasRangeConfig = !!this.config.xAxisEnd || !!this.config.yAxisEnd;
+    const rangeDocs = hasRangeConfig
+      ? this.result.documents.filter(doc => this.isRangeDoc(doc))
+      : [];
+    const rangeDocPaths = new Set(rangeDocs.map(d => d.path));
+
     // Create rows with Y-axis labels and cells
-    for (const yVal of yValues) {
+    const cellGrid: HTMLElement[][] = [];
+    for (let yi = 0; yi < yValues.length; yi++) {
+      const yVal = yValues[yi];
+      cellGrid[yi] = [];
+
       // Y-axis label
       const yHeader = board.createDiv({ cls: "hermione-board-header-y" });
       yHeader.createSpan({ text: String(yVal) });
 
       // Create cells for each X value
-      for (const xVal of xValues) {
+      for (let xi = 0; xi < xValues.length; xi++) {
+        const xVal = xValues[xi];
         const cell = board.createDiv({ cls: "hermione-board-cell" });
+        cellGrid[yi][xi] = cell;
 
         // Set data attributes for drop target identification
         cell.dataset.xValue = String(xVal);
@@ -266,8 +289,10 @@ export class MatrixRenderer extends MarkdownRenderChild {
         // Setup drop zone
         this.setupDropZone(cell, xVal, yVal, xValues, yValues);
 
-        // Find documents matching this X/Y combination (transform- and exact-aware)
+        // Find point documents matching this X/Y combination (skip range docs)
         const matchingDocs = this.result.documents.filter(doc => {
+          if (rangeDocPaths.has(doc.path)) return false;
+
           const rawX = this.getPropertyValue(doc.properties, this.config.xAxis!);
           const rawY = this.getPropertyValue(doc.properties, this.config.yAxis!);
 
@@ -289,6 +314,11 @@ export class MatrixRenderer extends MarkdownRenderChild {
           }
         }
       }
+    }
+
+    // Render range cards with absolute positioning and lane stacking
+    if (rangeDocs.length > 0) {
+      this.renderRangeCards(board, rangeDocs, xValues, yValues, cellGrid);
     }
 
     // X-axis label (centered below data columns, inside the grid)
@@ -341,13 +371,24 @@ export class MatrixRenderer extends MarkdownRenderChild {
     const board = zoomWrapper.createDiv({ cls: "hermione-board hermione-board-single-axis" });
     this.boardEl = board;
 
+    // Separate range docs from point docs for single-axis
+    const rangeEndProp = isYOnly ? this.config.yAxisEnd : this.config.xAxisEnd;
+    const hasRangeConfig = !!rangeEndProp;
+    const rangeDocs = hasRangeConfig
+      ? this.result.documents.filter(doc => this.isRangeDoc(doc))
+      : [];
+    const rangeDocPaths = new Set(rangeDocs.map(d => d.path));
+
+    const cellArray: HTMLElement[] = [];
+
     if (isYOnly) {
       // Y-only: vertical layout — header left, cell right per row
       board.style.gridTemplateColumns = `auto 1fr`;
 
       this.applyZoom();
 
-      for (const val of axisValues) {
+      for (let i = 0; i < axisValues.length; i++) {
+        const val = axisValues[i];
         // Y-header on the left
         const header = board.createDiv({ cls: "hermione-board-header-y" });
         header.createSpan({ text: String(val) });
@@ -355,10 +396,12 @@ export class MatrixRenderer extends MarkdownRenderChild {
         // Cell on the right
         const cell = board.createDiv({ cls: "hermione-board-cell hermione-board-cell-horizontal" });
         cell.dataset.yValue = String(val);
+        cellArray[i] = cell;
 
         this.setupDropZone(cell, undefined, val, [], axisValues);
 
         const matchingDocs = this.result.documents.filter(doc => {
+          if (rangeDocPaths.has(doc.path)) return false;
           const raw = this.getPropertyValue(doc.properties, axisProperty);
           return Array.isArray(raw)
             ? raw.some(v => this.matchesCellValue(v, val, transformFn, isExact, axisValues))
@@ -371,6 +414,11 @@ export class MatrixRenderer extends MarkdownRenderChild {
             this.renderDocumentCard(items, doc);
           }
         }
+      }
+
+      // Render range cards for Y-only
+      if (rangeDocs.length > 0) {
+        this.renderSingleAxisRangeCards(board, rangeDocs, axisValues, "y", cellArray);
       }
 
       // Axis label below
@@ -392,13 +440,16 @@ export class MatrixRenderer extends MarkdownRenderChild {
       }
 
       // Single row of cells
-      for (const val of axisValues) {
+      for (let i = 0; i < axisValues.length; i++) {
+        const val = axisValues[i];
         const cell = board.createDiv({ cls: "hermione-board-cell" });
         cell.dataset.xValue = String(val);
+        cellArray[i] = cell;
 
         this.setupDropZone(cell, val, undefined, axisValues, []);
 
         const matchingDocs = this.result.documents.filter(doc => {
+          if (rangeDocPaths.has(doc.path)) return false;
           const raw = this.getPropertyValue(doc.properties, axisProperty);
           return Array.isArray(raw)
             ? raw.some(v => this.matchesCellValue(v, val, transformFn, isExact, axisValues))
@@ -411,6 +462,11 @@ export class MatrixRenderer extends MarkdownRenderChild {
             this.renderDocumentCard(items, doc);
           }
         }
+      }
+
+      // Render range cards for X-only
+      if (rangeDocs.length > 0) {
+        this.renderSingleAxisRangeCards(board, rangeDocs, axisValues, "x", cellArray);
       }
 
       // Axis label below
@@ -897,6 +953,514 @@ export class MatrixRenderer extends MarkdownRenderChild {
       this.previewEl.remove();
       this.previewEl = null;
     }
+  }
+
+  /**
+   * Find the index of the axis value that a raw value maps to.
+   * Returns -1 if no match found.
+   */
+  private findValueIndex(
+    rawValue: any,
+    axisValues: any[],
+    transformFn: ((v: any) => any) | null,
+    isExact: boolean
+  ): number {
+    for (let i = 0; i < axisValues.length; i++) {
+      if (this.matchesCellValue(rawValue, axisValues[i], transformFn, isExact, axisValues)) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  /**
+   * Check if a document is a range document (has range end values).
+   */
+  private isRangeDoc(doc: DocumentData): boolean {
+    if (this.config.xAxisEnd) {
+      const endVal = this.getPropertyValue(doc.properties, this.config.xAxisEnd);
+      if (endVal !== undefined && endVal !== null && endVal !== "") return true;
+    }
+    if (this.config.yAxisEnd) {
+      const endVal = this.getPropertyValue(doc.properties, this.config.yAxisEnd);
+      if (endVal !== undefined && endVal !== null && endVal !== "") return true;
+    }
+    return false;
+  }
+
+  /**
+   * Compute range card layouts with positions and assign stacking lanes.
+   */
+  private computeRangeLayouts(
+    rangeDocs: DocumentData[],
+    xValues: any[],
+    yValues: any[]
+  ): { doc: DocumentData; xStartIdx: number; xEndIdx: number; yStartIdx: number; yEndIdx: number; hasXRange: boolean; hasYRange: boolean; lane: number; totalLanes: number }[] {
+    const layouts: { doc: DocumentData; xStartIdx: number; xEndIdx: number; yStartIdx: number; yEndIdx: number; hasXRange: boolean; hasYRange: boolean; lane: number; totalLanes: number }[] = [];
+
+    for (const doc of rangeDocs) {
+      let xStartIdx = 0, xEndIdx = 0, hasXRange = false;
+      let yStartIdx = 0, yEndIdx = 0, hasYRange = false;
+
+      if (this.config.xAxis) {
+        const rawXStart = this.getPropertyValue(doc.properties, this.config.xAxis);
+        xStartIdx = this.findValueIndex(rawXStart, xValues, this.xTransformFn, !!this.config.xExact);
+        if (this.config.xAxisEnd) {
+          const rawXEnd = this.getPropertyValue(doc.properties, this.config.xAxisEnd);
+          if (rawXEnd !== undefined && rawXEnd !== null && rawXEnd !== "") {
+            xEndIdx = this.findValueIndex(rawXEnd, xValues, this.xTransformFn, !!this.config.xExact);
+            hasXRange = xStartIdx >= 0 && xEndIdx >= 0;
+          }
+        }
+        if (!hasXRange) {
+          if (xStartIdx < 0) continue;
+          xEndIdx = xStartIdx;
+        }
+        if (xStartIdx > xEndIdx) [xStartIdx, xEndIdx] = [xEndIdx, xStartIdx];
+      }
+
+      if (this.config.yAxis) {
+        const rawYStart = this.getPropertyValue(doc.properties, this.config.yAxis);
+        yStartIdx = this.findValueIndex(rawYStart, yValues, this.yTransformFn, !!this.config.yExact);
+        if (this.config.yAxisEnd) {
+          const rawYEnd = this.getPropertyValue(doc.properties, this.config.yAxisEnd);
+          if (rawYEnd !== undefined && rawYEnd !== null && rawYEnd !== "") {
+            yEndIdx = this.findValueIndex(rawYEnd, yValues, this.yTransformFn, !!this.config.yExact);
+            hasYRange = yStartIdx >= 0 && yEndIdx >= 0;
+          }
+        }
+        if (!hasYRange) {
+          if (yStartIdx < 0) continue;
+          yEndIdx = yStartIdx;
+        }
+        if (yStartIdx > yEndIdx) [yStartIdx, yEndIdx] = [yEndIdx, yStartIdx];
+      }
+
+      layouts.push({ doc, xStartIdx, xEndIdx, yStartIdx, yEndIdx, hasXRange, hasYRange, lane: -1, totalLanes: 1 });
+    }
+
+    this.assignRangeLanes(layouts);
+    return layouts;
+  }
+
+  /**
+   * Assign stacking lanes to overlapping range cards using greedy interval graph coloring.
+   */
+  private assignRangeLanes(layouts: { xStartIdx: number; xEndIdx: number; yStartIdx: number; yEndIdx: number; lane: number; totalLanes: number }[]): void {
+    const overlaps = (a: typeof layouts[0], b: typeof layouts[0]): boolean => {
+      return a.xStartIdx <= b.xEndIdx && b.xStartIdx <= a.xEndIdx
+          && a.yStartIdx <= b.yEndIdx && b.yStartIdx <= a.yEndIdx;
+    };
+
+    layouts.sort((a, b) => a.yStartIdx !== b.yStartIdx ? a.yStartIdx - b.yStartIdx : a.xStartIdx - b.xStartIdx);
+
+    for (const layout of layouts) {
+      const usedLanes = new Set<number>();
+      for (const other of layouts) {
+        if (other === layout) continue;
+        if (other.lane >= 0 && overlaps(layout, other)) {
+          usedLanes.add(other.lane);
+        }
+      }
+      let lane = 0;
+      while (usedLanes.has(lane)) lane++;
+      layout.lane = lane;
+    }
+
+    for (const layout of layouts) {
+      let maxLane = layout.lane;
+      for (const other of layouts) {
+        if (other === layout) continue;
+        if (overlaps(layout, other)) {
+          maxLane = Math.max(maxLane, other.lane);
+        }
+      }
+      layout.totalLanes = maxLane + 1;
+    }
+  }
+
+  /**
+   * Render range cards with absolute positioning and lane-based stacking.
+   */
+  private renderRangeCards(
+    board: HTMLElement,
+    rangeDocs: DocumentData[],
+    xValues: any[],
+    yValues: any[],
+    cellGrid: HTMLElement[][]
+  ): void {
+    const layouts = this.computeRangeLayouts(rangeDocs, xValues, yValues);
+    if (layouts.length === 0) return;
+
+    const gap = 2;
+
+    for (const layout of layouts) {
+      const startCell = cellGrid[layout.yStartIdx]?.[layout.xStartIdx];
+      const endCell = cellGrid[layout.yEndIdx]?.[layout.xEndIdx];
+      if (!startCell || !endCell) continue;
+
+      const left = startCell.offsetLeft;
+      const top = startCell.offsetTop;
+      const right = endCell.offsetLeft + endCell.offsetWidth;
+      const bottom = endCell.offsetTop + endCell.offsetHeight;
+      const totalWidth = right - left;
+      const totalHeight = bottom - top;
+
+      const stackVertically = layout.hasXRange || !layout.hasYRange;
+      const isVertical = layout.hasYRange && !layout.hasXRange;
+
+      const card = board.createDiv({ cls: "hermione-card hermione-range-card" });
+
+      if (stackVertically) {
+        const laneH = (totalHeight - (layout.totalLanes - 1) * gap) / layout.totalLanes;
+        card.style.left = `${left}px`;
+        card.style.top = `${top + layout.lane * (laneH + gap)}px`;
+        card.style.width = `${totalWidth}px`;
+        card.style.height = `${laneH}px`;
+      } else {
+        const laneW = (totalWidth - (layout.totalLanes - 1) * gap) / layout.totalLanes;
+        card.style.left = `${left + layout.lane * (laneW + gap)}px`;
+        card.style.top = `${top}px`;
+        card.style.width = `${laneW}px`;
+        card.style.height = `${totalHeight}px`;
+      }
+
+      if (isVertical) {
+        card.addClass("hermione-range-card-vertical");
+      }
+
+      this.renderRangeCardContent(card, layout.doc, board, layout, xValues, yValues);
+    }
+  }
+
+  /**
+   * Render range cards for single-axis boards with lane stacking.
+   */
+  private renderSingleAxisRangeCards(
+    board: HTMLElement,
+    rangeDocs: DocumentData[],
+    axisValues: any[],
+    axis: "x" | "y",
+    cellArray: HTMLElement[]
+  ): void {
+    const axisProperty = axis === "x" ? this.config.xAxis! : this.config.yAxis!;
+    const axisEndProperty = axis === "x" ? this.config.xAxisEnd! : this.config.yAxisEnd!;
+    const transformFn = axis === "x" ? this.xTransformFn : this.yTransformFn;
+    const isExact = axis === "x" ? !!this.config.xExact : !!this.config.yExact;
+    const isReadonly = axis === "x" ? !!this.config.xReadonly : !!this.config.yReadonly;
+
+    // Compute layouts with lane assignment
+    const layouts: { doc: DocumentData; startIdx: number; endIdx: number; lane: number; totalLanes: number }[] = [];
+    for (const doc of rangeDocs) {
+      const rawStart = this.getPropertyValue(doc.properties, axisProperty);
+      const rawEnd = this.getPropertyValue(doc.properties, axisEndProperty);
+      let startIdx = this.findValueIndex(rawStart, axisValues, transformFn, isExact);
+      let endIdx = this.findValueIndex(rawEnd, axisValues, transformFn, isExact);
+      if (startIdx < 0 || endIdx < 0) continue;
+      if (startIdx > endIdx) [startIdx, endIdx] = [endIdx, startIdx];
+      layouts.push({ doc, startIdx, endIdx, lane: -1, totalLanes: 1 });
+    }
+
+    // Assign lanes using 1D overlap check
+    const overlaps = (a: typeof layouts[0], b: typeof layouts[0]): boolean => {
+      return a.startIdx <= b.endIdx && b.startIdx <= a.endIdx;
+    };
+    layouts.sort((a, b) => a.startIdx - b.startIdx);
+    for (const layout of layouts) {
+      const usedLanes = new Set<number>();
+      for (const other of layouts) {
+        if (other === layout) continue;
+        if (other.lane >= 0 && overlaps(layout, other)) usedLanes.add(other.lane);
+      }
+      let lane = 0;
+      while (usedLanes.has(lane)) lane++;
+      layout.lane = lane;
+    }
+    for (const layout of layouts) {
+      let maxLane = layout.lane;
+      for (const other of layouts) {
+        if (other === layout) continue;
+        if (overlaps(layout, other)) maxLane = Math.max(maxLane, other.lane);
+      }
+      layout.totalLanes = maxLane + 1;
+    }
+
+    const gap = 2;
+    for (const layout of layouts) {
+      const startCell = cellArray[layout.startIdx];
+      const endCell = cellArray[layout.endIdx];
+      if (!startCell || !endCell) continue;
+
+      const card = board.createDiv({ cls: "hermione-card hermione-range-card" });
+
+      if (axis === "x") {
+        // Horizontal: stack vertically within the row
+        const left = startCell.offsetLeft;
+        const right = endCell.offsetLeft + endCell.offsetWidth;
+        const top = startCell.offsetTop;
+        const cellHeight = startCell.offsetHeight;
+        const laneH = (cellHeight - (layout.totalLanes - 1) * gap) / layout.totalLanes;
+        card.style.left = `${left}px`;
+        card.style.top = `${top + layout.lane * (laneH + gap)}px`;
+        card.style.width = `${right - left}px`;
+        card.style.height = `${laneH}px`;
+      } else {
+        // Vertical: stack horizontally within the column
+        const top = startCell.offsetTop;
+        const bottom = endCell.offsetTop + endCell.offsetHeight;
+        const left = startCell.offsetLeft;
+        const cellWidth = startCell.offsetWidth;
+        const laneW = (cellWidth - (layout.totalLanes - 1) * gap) / layout.totalLanes;
+        card.style.left = `${left + layout.lane * (laneW + gap)}px`;
+        card.style.top = `${top}px`;
+        card.style.width = `${laneW}px`;
+        card.style.height = `${bottom - top}px`;
+        card.addClass("hermione-range-card-vertical");
+      }
+
+      // Card content
+      const cardStyle = this.evaluateCardStyle(layout.doc);
+      const colorBar = card.createDiv({ cls: "hermione-card-color" });
+      colorBar.style.backgroundColor = cardStyle.color || this.getDocumentColor(layout.doc.name);
+      if (cardStyle.background) card.style.backgroundColor = cardStyle.background;
+      if (cardStyle.border) card.style.borderLeft = `3px solid ${cardStyle.border}`;
+      const content = card.createDiv({ cls: "hermione-card-content" });
+      const titleSpan = content.createSpan({ cls: "hermione-card-title", text: layout.doc.name });
+      if (cardStyle.textColor) titleSpan.style.color = cardStyle.textColor;
+      card.dataset.docPath = layout.doc.path;
+
+      card.addEventListener("click", (e) => {
+        if ((e.target as HTMLElement).classList.contains("hermione-range-handle")) return;
+        e.preventDefault();
+        this.app.workspace.openLinkText(layout.doc.path, "");
+      });
+      card.addEventListener("mouseenter", (e) => this.schedulePreview(layout.doc, e));
+      card.addEventListener("mouseleave", () => this.hidePreview());
+      card.addEventListener("mousemove", (e) => { if (this.previewEl) this.positionPreview(e); });
+
+      if (!isReadonly) {
+        if (axis === "x") {
+          const leftHandle = card.createDiv({ cls: "hermione-range-handle hermione-range-handle-left" });
+          const rightHandle = card.createDiv({ cls: "hermione-range-handle hermione-range-handle-right" });
+          this.setupResizeHandle(leftHandle, layout.doc, "start", "x", axisValues, board);
+          this.setupResizeHandle(rightHandle, layout.doc, "end", "x", axisValues, board);
+        } else {
+          const topHandle = card.createDiv({ cls: "hermione-range-handle hermione-range-handle-top" });
+          const bottomHandle = card.createDiv({ cls: "hermione-range-handle hermione-range-handle-bottom" });
+          this.setupResizeHandle(topHandle, layout.doc, "start", "y", axisValues, board);
+          this.setupResizeHandle(bottomHandle, layout.doc, "end", "y", axisValues, board);
+        }
+      }
+    }
+  }
+
+  /**
+   * Render the content and event handlers for a range card in the matrix view.
+   */
+  private renderRangeCardContent(
+    card: HTMLElement,
+    doc: DocumentData,
+    board: HTMLElement,
+    layout: { hasXRange: boolean; hasYRange: boolean },
+    xValues: any[],
+    yValues: any[]
+  ): void {
+    const cardStyle = this.evaluateCardStyle(doc);
+    const colorBar = card.createDiv({ cls: "hermione-card-color" });
+    colorBar.style.backgroundColor = cardStyle.color || this.getDocumentColor(doc.name);
+    if (cardStyle.background) card.style.backgroundColor = cardStyle.background;
+    if (cardStyle.border) card.style.borderLeft = `3px solid ${cardStyle.border}`;
+
+    const content = card.createDiv({ cls: "hermione-card-content" });
+    const titleSpan = content.createSpan({ cls: "hermione-card-title", text: doc.name });
+    if (cardStyle.textColor) titleSpan.style.color = cardStyle.textColor;
+
+    card.dataset.docPath = doc.path;
+    card.addEventListener("click", (e) => {
+      if ((e.target as HTMLElement).classList.contains("hermione-range-handle")) return;
+      e.preventDefault();
+      this.app.workspace.openLinkText(doc.path, "");
+    });
+    card.addEventListener("mouseenter", (e) => this.schedulePreview(doc, e));
+    card.addEventListener("mouseleave", () => this.hidePreview());
+    card.addEventListener("mousemove", (e) => { if (this.previewEl) this.positionPreview(e); });
+
+    if (layout.hasXRange && !this.config.xReadonly) {
+      const leftHandle = card.createDiv({ cls: "hermione-range-handle hermione-range-handle-left" });
+      const rightHandle = card.createDiv({ cls: "hermione-range-handle hermione-range-handle-right" });
+      this.setupResizeHandle(leftHandle, doc, "start", "x", xValues, board);
+      this.setupResizeHandle(rightHandle, doc, "end", "x", xValues, board);
+    }
+    if (layout.hasYRange && !this.config.yReadonly) {
+      const topHandle = card.createDiv({ cls: "hermione-range-handle hermione-range-handle-top" });
+      const bottomHandle = card.createDiv({ cls: "hermione-range-handle hermione-range-handle-bottom" });
+      this.setupResizeHandle(topHandle, doc, "start", "y", yValues, board);
+      this.setupResizeHandle(bottomHandle, doc, "end", "y", yValues, board);
+    }
+  }
+
+  /**
+   * Setup a resize handle for range cards.
+   */
+  private setupResizeHandle(
+    handle: HTMLElement,
+    doc: DocumentData,
+    edge: "start" | "end",
+    axis: "x" | "y",
+    allValues: any[],
+    board: HTMLElement
+  ): void {
+    handle.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const card = handle.closest(".hermione-range-card") as HTMLElement;
+      if (!card) return;
+
+      const cellPositions = this.calculateCellPositions(board, axis, allValues);
+      const boardRect = board.getBoundingClientRect();
+      const scale = this.zoomLevel / 100;
+
+      this.resizeState = {
+        doc,
+        edge,
+        axis,
+        cardEl: card,
+        allValues,
+        cellPositions,
+        boardRect,
+        scale
+      };
+
+      card.addClass("hermione-range-resizing");
+
+      const onMouseMove = (ev: MouseEvent) => {
+        if (!this.resizeState) return;
+        const mousePos = axis === "x" ? ev.clientX : ev.clientY;
+        const targetIdx = this.findClosestCellIndex(mousePos, this.resizeState.cellPositions);
+        if (targetIdx >= 0) {
+          const cellPos = this.resizeState.cellPositions[targetIdx];
+          const br = this.resizeState.boardRect;
+          const sc = this.resizeState.scale;
+
+          if (axis === "x") {
+            const currentLeft = parseFloat(card.style.left);
+            const currentWidth = parseFloat(card.style.width);
+            if (edge === "start") {
+              const newLeft = (cellPos.start - br.left) / sc;
+              card.style.left = `${newLeft}px`;
+              card.style.width = `${currentLeft + currentWidth - newLeft}px`;
+            } else {
+              const newRight = (cellPos.end - br.left) / sc;
+              card.style.width = `${newRight - currentLeft}px`;
+            }
+          } else {
+            const currentTop = parseFloat(card.style.top);
+            const currentHeight = parseFloat(card.style.height);
+            if (edge === "start") {
+              const newTop = (cellPos.start - br.top) / sc;
+              card.style.top = `${newTop}px`;
+              card.style.height = `${currentTop + currentHeight - newTop}px`;
+            } else {
+              const newBottom = (cellPos.end - br.top) / sc;
+              card.style.height = `${newBottom - currentTop}px`;
+            }
+          }
+        }
+      };
+
+      const onMouseUp = async (ev: MouseEvent) => {
+        document.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("mouseup", onMouseUp);
+
+        if (!this.resizeState) return;
+
+        card.removeClass("hermione-range-resizing");
+
+        const mousePos = axis === "x" ? ev.clientX : ev.clientY;
+        const targetIdx = this.findClosestCellIndex(mousePos, this.resizeState.cellPositions);
+
+        if (targetIdx >= 0 && targetIdx < allValues.length) {
+          const newValue = allValues[targetIdx];
+          const property = edge === "start"
+            ? (axis === "x" ? this.config.xAxis! : this.config.yAxis!)
+            : (axis === "x" ? this.config.xAxisEnd! : this.config.yAxisEnd!);
+
+          try {
+            const writeValue = await this.resolveDropValue(
+              newValue,
+              axis === "x" ? this.xTransformFn : this.yTransformFn,
+              axis === "x" ? this.xReverseMap : this.yReverseMap,
+              property
+            );
+            if (writeValue !== null) {
+              await this.updater.updateProperties(doc.file, { [property]: writeValue });
+              this.refreshOnCacheUpdate(doc.file);
+            }
+          } catch (error) {
+            console.error("Hermione: Failed to update range:", error);
+          }
+        }
+
+        this.resizeState = null;
+      };
+
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
+    });
+  }
+
+  /**
+   * Calculate the screen positions of cells along an axis (viewport coords).
+   */
+  private calculateCellPositions(
+    board: HTMLElement,
+    axis: "x" | "y",
+    allValues: any[]
+  ): { value: any; start: number; end: number }[] {
+    const positions: { value: any; start: number; end: number }[] = [];
+    const cells = board.querySelectorAll(".hermione-board-cell");
+
+    for (let i = 0; i < allValues.length; i++) {
+      const val = String(allValues[i]);
+      for (const cell of Array.from(cells)) {
+        const el = cell as HTMLElement;
+        const cellVal = axis === "x" ? el.dataset.xValue : el.dataset.yValue;
+        if (cellVal === val) {
+          const rect = el.getBoundingClientRect();
+          positions.push({
+            value: allValues[i],
+            start: axis === "x" ? rect.left : rect.top,
+            end: axis === "x" ? rect.right : rect.bottom
+          });
+          break;
+        }
+      }
+    }
+
+    return positions;
+  }
+
+  /**
+   * Find the closest cell index to a mouse position.
+   */
+  private findClosestCellIndex(
+    mousePos: number,
+    cellPositions: { value: any; start: number; end: number }[]
+  ): number {
+    let bestIdx = -1;
+    let bestDist = Infinity;
+
+    for (let i = 0; i < cellPositions.length; i++) {
+      const mid = (cellPositions[i].start + cellPositions[i].end) / 2;
+      const dist = Math.abs(mousePos - mid);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestIdx = i;
+      }
+    }
+
+    return bestIdx;
   }
 
   /**

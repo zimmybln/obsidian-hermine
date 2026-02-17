@@ -239,6 +239,20 @@ export function parseHermioneBlock(content: string): HermioneConfig {
           }
         }
         break;
+      case "x-bis":
+      case "x-end":
+      case "x-axis-end":
+      case "xbis":
+      case "xend":
+        config.xAxisEnd = value;
+        break;
+      case "y-bis":
+      case "y-end":
+      case "y-axis-end":
+      case "ybis":
+      case "yend":
+        config.yAxisEnd = value;
+        break;
       case "preview":
       case "vorschau":
       case "tooltip":

@@ -56,3 +56,39 @@ Jedes Dokument-Objekt hat folgende Felder: file (TFile), path, name und properti
 
 
 row-height: flexible | static
+
+Die Von...Bis Range-Card-Funktion wurde implementiert. Hier eine Zusammenfassung der Änderungen:
+
+Neue Konfigurationsoptionen
+
+source: Projekte
+x-achse: StartDatum
+x-bis: EndDatum
+y-achse: Priorität
+Parser-Schlüssel:
+
+x-bis / x-end / xbis / xend / x-axis-end → Endwert der X-Achse
+y-bis / y-end / ybis / yend / y-axis-end → Endwert der Y-Achse
+
+Geänderte Dateien
+types.ts — xAxisEnd und yAxisEnd zum HermioneConfig hinzugefügt
+parser.ts — Neue Parser-Einträge für die Range-End-Schlüssel
+matrix-renderer.ts — Umfangreiche Änderungen:
+
+Range-Dokumente werden vom normalen Rendering getrennt
+renderRangeCards() — platziert Karten direkt im CSS-Grid mit grid-column/grid-row-Spanning
+renderSingleAxisRangeCards() — dasselbe für Single-Axis-Boards
+setupResizeHandle() — Maus-basierte Resize-Interaktion an den Rändern
+calculateCellPositions() / findClosestCellIndex() — Berechnung der Zellpositionen für Snapping
+updateRangePreview() — Visuelle Vorschau während des Resizens
+styles.css — Range-Card-Styles:
+Vertikale Karten mit 90°-gedrehtem Text (writing-mode: vertical-rl)
+Resize-Handles an allen Rändern (links/rechts für X, oben/unten für Y)
+Glass-Theme-Varianten für Range-Cards
+Funktionsweise
+Karten mit Von...Bis-Eigenschaft spannen über mehrere Zellen auf der jeweiligen Achse
+An beiden Rändern erscheinen beim Hover Resize-Handles
+Durch Ziehen der Handles wird der Start- oder Endwert aktualisiert und ins Frontmatter geschrieben
+Transform-Support funktioniert auch für Range-Endwerte
+Alle bestehenden Card-Styles (card-style) werden angewendet
+Vertikale Range-Karten zeigen den Text um 90° gedreht an

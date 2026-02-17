@@ -53,6 +53,10 @@ export interface HermioneConfig {
   rowHeight?: "flexible" | "static";
   /** Preview mode on card hover: "document" (default), "axes", or "properties" */
   preview?: "document" | "axes" | "properties";
+  /** End property for X-axis range (Von...Bis). Creates cards spanning multiple columns. */
+  xAxisEnd?: string;
+  /** End property for Y-axis range (Von...Bis). Creates cards spanning multiple rows. */
+  yAxisEnd?: string;
 }
 
 /**

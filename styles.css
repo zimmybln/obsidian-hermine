@@ -130,6 +130,7 @@
   background: linear-gradient(135deg, var(--background-secondary) 0%, var(--background-primary) 100%);
   border-radius: var(--radius-m);
   min-width: fit-content;
+  position: relative;
 }
 
 /* Single-axis board */
@@ -293,6 +294,117 @@
 
 .hermione-card:hover .hermione-card-title {
   color: var(--text-accent);
+}
+
+/* ==========================================
+   RANGE CARDS (Von...Bis)
+   ========================================== */
+
+/* Range card: absolutely positioned within the board, lane-stacked */
+.hermione-range-card {
+  position: absolute;
+  z-index: 1;
+  min-height: 0;
+  cursor: pointer;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.hermione-range-card:hover {
+  z-index: 2;
+}
+
+/* Vertical range card: text rotated 90° */
+.hermione-range-card-vertical .hermione-card-content {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  text-align: center;
+  padding: 10px 4px;
+}
+
+.hermione-range-card-vertical .hermione-card-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-height: 100%;
+}
+
+.hermione-range-card-vertical .hermione-card-color {
+  width: 100%;
+  min-height: 4px;
+  height: 4px;
+  min-width: auto;
+}
+
+.hermione-range-card-vertical {
+  flex-direction: column;
+}
+
+/* Resize handles */
+.hermione-range-handle {
+  position: absolute;
+  z-index: 3;
+  opacity: 0;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.hermione-range-card:hover .hermione-range-handle {
+  opacity: 1;
+}
+
+/* Horizontal resize handles (left/right) */
+.hermione-range-handle-left,
+.hermione-range-handle-right {
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  background: linear-gradient(90deg, transparent, var(--interactive-accent), transparent);
+}
+
+.hermione-range-handle-left {
+  left: 0;
+  border-radius: var(--radius-s) 0 0 var(--radius-s);
+}
+
+.hermione-range-handle-right {
+  right: 0;
+  border-radius: 0 var(--radius-s) var(--radius-s) 0;
+}
+
+/* Vertical resize handles (top/bottom) */
+.hermione-range-handle-top,
+.hermione-range-handle-bottom {
+  left: 0;
+  right: 0;
+  height: 8px;
+  cursor: row-resize;
+  background: linear-gradient(180deg, transparent, var(--interactive-accent), transparent);
+}
+
+.hermione-range-handle-top {
+  top: 0;
+  border-radius: var(--radius-s) var(--radius-s) 0 0;
+}
+
+.hermione-range-handle-bottom {
+  bottom: 0;
+  border-radius: 0 0 var(--radius-s) var(--radius-s);
+}
+
+.hermione-range-handle:hover {
+  opacity: 1;
+  background-color: var(--interactive-accent);
+}
+
+/* Resizing state */
+.hermione-range-resizing {
+  opacity: 0.8;
+  box-shadow: 0 0 12px rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.4);
+}
+
+.hermione-range-resizing .hermione-range-handle {
+  opacity: 1;
 }
 
 /* Drop zone states */
@@ -1054,6 +1166,28 @@
   opacity: 0.5;
   transform: rotate(2deg) scale(1.02);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+}
+
+/* Glass range cards */
+.hermione-theme-glass .hermione-range-card {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+}
+
+.hermione-theme-glass .hermione-range-handle {
+  background: linear-gradient(90deg, transparent, rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.6), transparent);
+}
+
+.hermione-theme-glass .hermione-range-handle-top,
+.hermione-theme-glass .hermione-range-handle-bottom {
+  background: linear-gradient(180deg, transparent, rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.6), transparent);
+}
+
+.hermione-theme-glass .hermione-range-resizing {
+  box-shadow: 0 0 16px rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.3);
 }
 
 /* Glass drop zone states */
