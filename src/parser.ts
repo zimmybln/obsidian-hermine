@@ -1,10 +1,11 @@
-import { HermineConfig } from "./types";
+import { HermioneConfig } from "./types";
 
 /** Keys that accept JavaScript arrow functions (may span multiple lines) */
 const FUNCTION_KEYS = new Set([
   "card-style", "karten-stil", "cardstyle", "style", "stil",
   "x-transform", "x-transformation", "xtransform",
   "y-transform", "y-transformation", "ytransform",
+  "filter", "filtern",
 ]);
 
 /**
@@ -70,11 +71,11 @@ function parseAxisValues(value: string): { values: string[]; exact: boolean } {
 }
 
 /**
- * Parses a Hermine code block content into configuration
+ * Parses a Hermione code block content into configuration
  */
-export function parseHermineBlock(content: string): HermineConfig {
+export function parseHermioneBlock(content: string): HermioneConfig {
   const lines = content.trim().split("\n");
-  const config: Partial<HermineConfig> = {};
+  const config: Partial<HermioneConfig> = {};
 
   for (let i = 0; i < lines.length; i++) {
     const trimmed = lines[i].trim();
@@ -225,6 +226,33 @@ export function parseHermineBlock(content: string): HermineConfig {
       case "hideunassigned":
         config.hideUnassigned = value.toLowerCase() !== "false" && value !== "0";
         break;
+      case "row-height":
+      case "zeilenhoehe":
+      case "zeilenhöhe":
+      case "rowheight":
+        {
+          const v = value.toLowerCase();
+          if (v === "flexible" || v === "flexibel" || v === "auto") {
+            config.rowHeight = "flexible";
+          } else {
+            config.rowHeight = "static";
+          }
+        }
+        break;
+      case "preview":
+      case "vorschau":
+      case "tooltip":
+        {
+          const v = value.toLowerCase();
+          if (v === "achsen" || v === "axes" || v === "axis") {
+            config.preview = "axes";
+          } else if (v === "eigenschaften" || v === "properties" || v === "alle" || v === "all") {
+            config.preview = "properties";
+          } else {
+            config.preview = "document";
+          }
+        }
+        break;
     }
   }
 
@@ -236,13 +264,13 @@ export function parseHermineBlock(content: string): HermineConfig {
     throw new Error("Mindestens eine Achse muss angegeben werden (X-Achse oder Y-Achse)");
   }
 
-  return config as HermineConfig;
+  return config as HermioneConfig;
 }
 
 /**
  * Validates the configuration
  */
-export function validateConfig(config: HermineConfig): string[] {
+export function validateConfig(config: HermioneConfig): string[] {
   const errors: string[] = [];
 
   if (!config.source) {

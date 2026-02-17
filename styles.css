@@ -1,12 +1,12 @@
-/* Hermine Plugin Styles */
+/* Hermione Plugin Styles */
 
-.hermine-container {
+.hermione-container {
   margin: 1em 0;
   overflow-x: auto;
 }
 
 /* Title */
-.hermine-title {
+.hermione-title {
   margin: 0 0 0.5em 0;
   padding: 0;
   color: var(--text-normal);
@@ -14,19 +14,19 @@
 }
 
 /* Error display */
-.hermine-errors {
+.hermione-errors {
   padding: 1em;
   background-color: var(--background-modifier-error);
   border-radius: var(--radius-s);
 }
 
-.hermine-error {
+.hermione-error {
   color: var(--text-error);
   padding: 0.5em;
 }
 
 /* Empty state */
-.hermine-empty {
+.hermione-empty {
   padding: 2em;
   text-align: center;
   color: var(--text-muted);
@@ -34,51 +34,51 @@
 }
 
 /* Table styles */
-.hermine-table,
-.hermine-matrix {
+.hermione-table,
+.hermione-matrix {
   width: 100%;
   border-collapse: collapse;
   font-size: var(--font-ui-small);
 }
 
-.hermine-table th,
-.hermine-table td,
-.hermine-matrix th,
-.hermine-matrix td {
+.hermione-table th,
+.hermione-table td,
+.hermione-matrix th,
+.hermione-matrix td {
   padding: 0.5em 0.75em;
   border: 1px solid var(--background-modifier-border);
   text-align: left;
   vertical-align: top;
 }
 
-.hermine-table th,
-.hermine-matrix th {
+.hermione-table th,
+.hermione-matrix th {
   background-color: var(--background-secondary);
   font-weight: var(--font-semibold);
   position: sticky;
   top: 0;
 }
 
-.hermine-table tbody tr:hover,
-.hermine-matrix tbody tr:hover {
+.hermione-table tbody tr:hover,
+.hermione-matrix tbody tr:hover {
   background-color: var(--background-modifier-hover);
 }
 
 /* Cell styles */
-.hermine-cell-name {
+.hermione-cell-name {
   white-space: nowrap;
 }
 
-.hermine-cell-name a {
+.hermione-cell-name a {
   color: var(--text-accent);
   text-decoration: none;
 }
 
-.hermine-cell-name a:hover {
+.hermione-cell-name a:hover {
   text-decoration: underline;
 }
 
-.hermine-cell-editable {
+.hermione-cell-editable {
   min-width: 100px;
 }
 
@@ -87,20 +87,20 @@
    ========================================== */
 
 /* Wrapper for Y-axis label + board */
-.hermine-board-layout {
+.hermione-board-layout {
   display: flex;
   align-items: stretch;
 }
 
 /* Y-axis label (rotated, left side) */
-.hermine-axis-label-y {
+.hermione-axis-label-y {
   display: flex;
   align-items: center;
   justify-content: center;
   padding-right: 8px;
 }
 
-.hermine-axis-label-y span {
+.hermione-axis-label-y span {
   writing-mode: vertical-rl;
   transform: rotate(180deg);
   font-weight: var(--font-semibold);
@@ -110,20 +110,20 @@
 }
 
 /* X-axis label (centered below data columns) */
-.hermine-axis-label-x {
+.hermione-axis-label-x {
   display: flex;
   align-items: center;
   justify-content: center;
   padding-top: 8px;
 }
 
-.hermine-axis-label-x span {
+.hermione-axis-label-x span {
   font-weight: var(--font-semibold);
   color: var(--text-muted);
   font-size: var(--font-ui-small);
 }
 
-.hermine-board {
+.hermione-board {
   display: grid;
   gap: 8px;
   padding: 8px;
@@ -133,44 +133,57 @@
 }
 
 /* Single-axis board */
-.hermine-board-single-axis .hermine-board-cell {
+.hermione-board-single-axis .hermione-board-cell {
   min-height: 120px;
 }
 
 /* Y-only: horizontal card flow inside cells */
-.hermine-board-cell-horizontal {
+.hermione-board-cell-horizontal {
   min-height: auto;
   min-width: 200px;
 }
 
-.hermine-board-items-horizontal {
+.hermione-board-items-horizontal {
   flex-direction: row;
   flex-wrap: wrap;
 }
 
 /* Single-axis: axis label centered below the board */
-.hermine-board-single-axis .hermine-axis-label-x,
-.hermine-axis-label-y-bottom {
+.hermione-board-single-axis .hermione-axis-label-x,
+.hermione-axis-label-y-bottom {
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 10px 0 2px;
 }
 
-.hermine-axis-label-y-bottom span {
+.hermione-axis-label-y-bottom span {
   font-weight: var(--font-semibold);
   color: var(--text-muted);
   font-size: var(--font-ui-small);
 }
 
+/* Flexible row height mode */
+.hermione-rows-flexible .hermione-board {
+  grid-auto-rows: min-content;
+}
+
+.hermione-rows-flexible .hermione-board-cell {
+  min-height: auto;
+}
+
+.hermione-rows-flexible .hermione-board-single-axis .hermione-board-cell {
+  min-height: auto;
+}
+
 /* Corner cell (empty top-left) */
-.hermine-board-corner {
+.hermione-board-corner {
   min-width: 100px;
   min-height: 40px;
 }
 
 /* X-axis header labels (top) */
-.hermine-board-header-x {
+.hermione-board-header-x {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -185,7 +198,7 @@
 }
 
 /* Y-axis header labels (left side) */
-.hermine-board-header-y {
+.hermione-board-header-y {
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -201,7 +214,7 @@
 }
 
 /* Board cells (drop zones) */
-.hermine-board-cell {
+.hermione-board-cell {
   min-width: 150px;
   min-height: 100px;
   padding: 8px;
@@ -214,13 +227,13 @@
   gap: 6px;
 }
 
-.hermine-board-cell:hover {
+.hermione-board-cell:hover {
   border-color: var(--background-modifier-border-hover);
   background-color: var(--background-primary-alt);
 }
 
 /* Items container inside board cell */
-.hermine-board-items {
+.hermione-board-items {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -228,7 +241,7 @@
 }
 
 /* Document card styles */
-.hermine-card {
+.hermione-card {
   display: flex;
   align-items: stretch;
   background-color: var(--background-secondary);
@@ -239,36 +252,36 @@
   overflow: hidden;
 }
 
-.hermine-card:hover {
+.hermione-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.hermine-card:active {
+.hermione-card:active {
   cursor: grabbing;
   transform: scale(0.98);
 }
 
-.hermine-card.hermine-card-dragging {
+.hermione-card.hermione-card-dragging {
   opacity: 0.6;
   transform: rotate(3deg);
 }
 
 /* Color indicator bar on the left */
-.hermine-card-color {
+.hermione-card-color {
   width: 4px;
   min-height: 100%;
   flex-shrink: 0;
 }
 
 /* Card content */
-.hermine-card-content {
+.hermione-card-content {
   padding: 8px 10px;
   flex: 1;
   min-width: 0;
 }
 
-.hermine-card-title {
+.hermione-card-title {
   font-size: var(--font-ui-small);
   color: var(--text-normal);
   font-weight: var(--font-medium);
@@ -278,18 +291,18 @@
   text-overflow: ellipsis;
 }
 
-.hermine-card:hover .hermine-card-title {
+.hermione-card:hover .hermione-card-title {
   color: var(--text-accent);
 }
 
 /* Drop zone states */
-.hermine-board-cell.hermine-drop-zone-active {
+.hermione-board-cell.hermione-drop-zone-active {
   border-style: solid;
   border-color: var(--interactive-accent);
   background-color: var(--background-modifier-hover);
 }
 
-.hermine-board-cell.hermine-drop-zone-hover {
+.hermione-board-cell.hermione-drop-zone-hover {
   background-color: color-mix(in srgb, var(--interactive-accent) 20%, transparent) !important;
   border-color: var(--interactive-accent) !important;
   border-style: solid !important;
@@ -300,11 +313,11 @@
    OLD TABLE-BASED MATRIX (fallback)
    ========================================== */
 
-.hermine-matrix th:first-child {
+.hermione-matrix th:first-child {
   min-width: 150px;
 }
 
-.hermine-matrix-cell {
+.hermione-matrix-cell {
   min-width: 80px;
   min-height: 60px;
   vertical-align: middle;
@@ -312,12 +325,12 @@
   transition: background-color 0.2s ease;
 }
 
-.hermine-matrix-cell-empty {
+.hermione-matrix-cell-empty {
   background-color: var(--background-secondary-alt);
 }
 
 /* Dots container (for table view) */
-.hermine-dots-container {
+.hermione-dots-container {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -326,7 +339,7 @@
 }
 
 /* Document dot wrapper (dot + title) for table view */
-.hermine-dot-wrapper {
+.hermione-dot-wrapper {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -337,20 +350,20 @@
   max-width: 100%;
 }
 
-.hermine-dot-wrapper:hover {
+.hermione-dot-wrapper:hover {
   background-color: var(--background-modifier-hover);
 }
 
-.hermine-dot-wrapper:active {
+.hermione-dot-wrapper:active {
   cursor: grabbing;
 }
 
-.hermine-dot-wrapper.hermine-dot-dragging {
+.hermione-dot-wrapper.hermione-dot-dragging {
   opacity: 0.5;
 }
 
 /* Document dot styles */
-.hermine-dot {
+.hermione-dot {
   width: 12px;
   height: 12px;
   min-width: 12px;
@@ -360,7 +373,7 @@
 }
 
 /* Document title next to dot */
-.hermine-dot-title {
+.hermione-dot-title {
   font-size: var(--font-ui-smaller);
   color: var(--text-normal);
   white-space: nowrap;
@@ -369,22 +382,22 @@
   max-width: 150px;
 }
 
-.hermine-dot-wrapper:hover .hermine-dot-title {
+.hermione-dot-wrapper:hover .hermione-dot-title {
   color: var(--text-accent);
 }
 
 /* General drop zone styles */
-.hermine-drop-zone-active {
+.hermione-drop-zone-active {
   background-color: var(--background-modifier-hover);
 }
 
-.hermine-drop-zone-hover {
+.hermione-drop-zone-hover {
   background-color: var(--interactive-accent) !important;
   opacity: 0.3;
 }
 
 /* Preview popup styles */
-.hermine-preview {
+.hermione-preview {
   position: fixed;
   z-index: 1000;
   width: 400px;
@@ -397,40 +410,77 @@
   pointer-events: none;
 }
 
-.hermine-preview-header {
+.hermione-preview-header {
   padding: 0.75em 1em;
   background-color: var(--background-secondary);
   border-bottom: 1px solid var(--background-modifier-border);
 }
 
-.hermine-preview-title {
+.hermione-preview-title {
   font-weight: var(--font-semibold);
   color: var(--text-normal);
 }
 
-.hermine-preview-content {
+.hermione-preview-content {
   padding: 1em;
   max-height: 230px;
   overflow-y: auto;
   font-size: var(--font-ui-small);
 }
 
-.hermine-preview-content p {
+.hermione-preview-content p {
   margin: 0 0 0.5em 0;
 }
 
-.hermine-preview-content p:last-child {
+.hermione-preview-content p:last-child {
   margin-bottom: 0;
 }
 
-.hermine-preview-error {
+.hermione-preview-error {
   color: var(--text-muted);
   font-style: italic;
 }
 
+/* Preview property list (axes / properties mode) */
+.hermione-preview-props {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hermione-preview-prop {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 2px 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.hermione-preview-prop:last-child {
+  border-bottom: none;
+}
+
+.hermione-preview-prop-key {
+  font-weight: var(--font-semibold);
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  white-space: nowrap;
+  min-width: 80px;
+}
+
+.hermione-preview-prop-key::after {
+  content: ":";
+}
+
+.hermione-preview-prop-value {
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+  word-break: break-word;
+}
+
 /* Legend styles */
 /* Unassigned documents section */
-.hermine-unassigned {
+.hermione-unassigned {
   margin-top: 1em;
   padding: 0.75em;
   background-color: var(--background-secondary);
@@ -438,7 +488,7 @@
   border: 1px dashed var(--background-modifier-border);
 }
 
-.hermine-unassigned-items {
+.hermione-unassigned-items {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5em;
@@ -446,54 +496,54 @@
 }
 
 /* Old matrix doc styles (for backward compatibility) */
-.hermine-matrix-doc {
+.hermione-matrix-doc {
   padding: 0.25em 0;
   border-bottom: 1px solid var(--background-modifier-border-hover);
 }
 
-.hermine-matrix-doc:last-child {
+.hermione-matrix-doc:last-child {
   border-bottom: none;
 }
 
-.hermine-matrix-doc a {
+.hermione-matrix-doc a {
   color: var(--text-accent);
   text-decoration: none;
   font-weight: var(--font-medium);
 }
 
-.hermine-matrix-doc a:hover {
+.hermione-matrix-doc a:hover {
   text-decoration: underline;
 }
 
-.hermine-matrix-prop {
+.hermione-matrix-prop {
   font-size: var(--font-ui-smaller);
   color: var(--text-muted);
   margin-top: 0.25em;
 }
 
-.hermine-prop-label {
+.hermione-prop-label {
   color: var(--text-faint);
 }
 
 /* Editable wrapper */
-.hermine-editable-wrapper {
+.hermione-editable-wrapper {
   display: inline-flex;
   align-items: center;
   gap: 0.25em;
   width: 100%;
 }
 
-.hermine-value-display {
+.hermione-value-display {
   flex: 1;
   cursor: pointer;
 }
 
-.hermine-value-display:hover {
+.hermione-value-display:hover {
   background-color: var(--background-modifier-hover);
   border-radius: var(--radius-s);
 }
 
-.hermine-value-input {
+.hermione-value-input {
   flex: 1;
   padding: 0.25em 0.5em;
   border: 1px solid var(--background-modifier-border-focus);
@@ -504,16 +554,16 @@
   min-width: 80px;
 }
 
-.hermine-value-input:focus {
+.hermione-value-input:focus {
   outline: none;
   border-color: var(--interactive-accent);
   box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
 }
 
 /* Buttons */
-.hermine-edit-btn,
-.hermine-save-btn,
-.hermine-cancel-btn {
+.hermione-edit-btn,
+.hermione-save-btn,
+.hermione-cancel-btn {
   padding: 0.125em 0.25em;
   background: transparent;
   border: none;
@@ -527,35 +577,35 @@
   transition: opacity 0.15s ease;
 }
 
-.hermine-editable-wrapper:hover .hermine-edit-btn,
-.hermine-save-btn,
-.hermine-cancel-btn {
+.hermione-editable-wrapper:hover .hermione-edit-btn,
+.hermione-save-btn,
+.hermione-cancel-btn {
   opacity: 1;
 }
 
-.hermine-edit-btn:hover {
+.hermione-edit-btn:hover {
   background-color: var(--background-modifier-hover);
   color: var(--text-normal);
 }
 
-.hermine-save-btn {
+.hermione-save-btn {
   color: var(--text-success);
 }
 
-.hermine-save-btn:hover {
+.hermione-save-btn:hover {
   background-color: var(--background-modifier-success);
 }
 
-.hermine-cancel-btn {
+.hermione-cancel-btn {
   color: var(--text-error);
 }
 
-.hermine-cancel-btn:hover {
+.hermione-cancel-btn:hover {
   background-color: var(--background-modifier-error);
 }
 
 /* Toolbar */
-.hermine-toolbar {
+.hermione-toolbar {
   margin-top: 0.75em;
   display: flex;
   justify-content: space-between;
@@ -565,7 +615,7 @@
 }
 
 /* Zoom controls */
-.hermine-zoom-controls {
+.hermione-zoom-controls {
   display: flex;
   align-items: center;
   gap: 0.25em;
@@ -575,7 +625,7 @@
   border: 1px solid var(--background-modifier-border);
 }
 
-.hermine-zoom-btn {
+.hermione-zoom-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -590,17 +640,17 @@
   transition: all 0.15s ease;
 }
 
-.hermine-zoom-btn:hover {
+.hermione-zoom-btn:hover {
   background-color: var(--background-modifier-hover);
   color: var(--text-normal);
 }
 
-.hermine-zoom-btn svg {
+.hermione-zoom-btn svg {
   width: 14px;
   height: 14px;
 }
 
-.hermine-zoom-display {
+.hermione-zoom-display {
   min-width: 50px;
   padding: 0.25em 0.5em;
   background-color: var(--background-primary);
@@ -613,12 +663,12 @@
   transition: all 0.15s ease;
 }
 
-.hermine-zoom-display:hover {
+.hermione-zoom-display:hover {
   background-color: var(--background-modifier-hover);
   border-color: var(--background-modifier-border-hover);
 }
 
-.hermine-zoom-slider {
+.hermione-zoom-slider {
   width: 80px;
   height: 4px;
   margin: 0 0.5em;
@@ -626,22 +676,22 @@
   accent-color: var(--interactive-accent);
 }
 
-.hermine-zoom-slider::-webkit-slider-thumb {
+.hermione-zoom-slider::-webkit-slider-thumb {
   cursor: grab;
 }
 
-.hermine-zoom-slider::-webkit-slider-thumb:active {
+.hermione-zoom-slider::-webkit-slider-thumb:active {
   cursor: grabbing;
 }
 
 /* Zoom wrapper for board */
-.hermine-zoom-wrapper {
+.hermione-zoom-wrapper {
   overflow: auto;
   padding: 8px;
   margin: -8px;
 }
 
-.hermine-refresh-btn {
+.hermione-refresh-btn {
   display: inline-flex;
   align-items: center;
   gap: 0.5em;
@@ -655,26 +705,26 @@
   transition: background-color 0.15s ease;
 }
 
-.hermine-refresh-btn:hover {
+.hermione-refresh-btn:hover {
   background-color: var(--interactive-hover);
 }
 
-.hermine-refresh-btn svg {
+.hermione-refresh-btn svg {
   width: 14px;
   height: 14px;
 }
 
 /* Value Picker Modal */
-.hermine-value-picker-modal {
+.hermione-value-picker-modal {
   max-width: 420px;
 }
 
-.hermine-value-picker-modal h3 {
+.hermione-value-picker-modal h3 {
   margin-top: 0;
   margin-bottom: 0.5em;
 }
 
-.hermine-picker-info {
+.hermione-picker-info {
   color: var(--text-muted);
   font-size: var(--font-ui-small);
   margin-bottom: 1em;
@@ -683,11 +733,11 @@
   border-radius: var(--radius-s);
 }
 
-.hermine-picker-input-container {
+.hermione-picker-input-container {
   margin-bottom: 0.75em;
 }
 
-.hermine-picker-input {
+.hermione-picker-input {
   width: 100%;
   padding: 0.5em 0.75em;
   border: 1px solid var(--background-modifier-border);
@@ -697,45 +747,45 @@
   font-size: var(--font-ui-medium);
 }
 
-.hermine-picker-input:focus {
+.hermione-picker-input:focus {
   outline: none;
   border-color: var(--interactive-accent);
   box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
 }
 
-.hermine-picker-validation {
+.hermione-picker-validation {
   font-size: var(--font-ui-small);
   min-height: 1.5em;
   margin-bottom: 0.75em;
   padding: 0.25em 0;
 }
 
-.hermine-picker-valid {
+.hermione-picker-valid {
   color: var(--text-success);
 }
 
-.hermine-picker-invalid {
+.hermione-picker-invalid {
   color: var(--text-error);
 }
 
-.hermine-picker-suggestions {
+.hermione-picker-suggestions {
   margin-bottom: 1em;
 }
 
-.hermine-picker-suggestions-label {
+.hermione-picker-suggestions-label {
   display: block;
   font-size: var(--font-ui-smaller);
   color: var(--text-muted);
   margin-bottom: 0.5em;
 }
 
-.hermine-picker-suggestions-list {
+.hermione-picker-suggestions-list {
   display: flex;
   flex-wrap: wrap;
   gap: 0.375em;
 }
 
-.hermine-picker-chip {
+.hermione-picker-chip {
   padding: 0.25em 0.625em;
   background-color: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
@@ -746,21 +796,21 @@
   transition: all 0.15s ease;
 }
 
-.hermine-picker-chip:hover {
+.hermione-picker-chip:hover {
   background-color: var(--interactive-accent);
   color: var(--text-on-accent);
   border-color: var(--interactive-accent);
 }
 
-.hermine-picker-buttons {
+.hermione-picker-buttons {
   display: flex;
   justify-content: flex-end;
   gap: 0.5em;
   margin-top: 1em;
 }
 
-.hermine-picker-confirm,
-.hermine-picker-cancel {
+.hermione-picker-confirm,
+.hermione-picker-cancel {
   padding: 0.5em 1.25em;
   border-radius: var(--radius-s);
   cursor: pointer;
@@ -768,44 +818,44 @@
   border: 1px solid var(--background-modifier-border);
 }
 
-.hermine-picker-confirm {
+.hermione-picker-confirm {
   background-color: var(--interactive-accent);
   color: var(--text-on-accent);
   border-color: var(--interactive-accent);
 }
 
-.hermine-picker-confirm:disabled {
+.hermione-picker-confirm:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
 
-.hermine-picker-confirm:not(:disabled):hover {
+.hermione-picker-confirm:not(:disabled):hover {
   filter: brightness(1.1);
 }
 
-.hermine-picker-cancel {
+.hermione-picker-cancel {
   background-color: var(--interactive-normal);
   color: var(--text-normal);
 }
 
-.hermine-picker-cancel:hover {
+.hermione-picker-cancel:hover {
   background-color: var(--interactive-hover);
 }
 
 /* Exact value modal */
-.hermine-exact-info {
+.hermione-exact-info {
   color: var(--text-muted);
   margin-bottom: 1em;
 }
 
-.hermine-exact-input-row {
+.hermione-exact-input-row {
   display: flex;
   align-items: center;
   gap: 12px;
   margin-bottom: 0.75em;
 }
 
-.hermine-exact-input {
+.hermione-exact-input {
   width: 80px;
   padding: 6px 8px;
   border: 1px solid var(--background-modifier-border);
@@ -815,24 +865,24 @@
   font-size: var(--font-ui-medium);
 }
 
-.hermine-exact-input:focus {
+.hermione-exact-input:focus {
   border-color: var(--interactive-accent);
   outline: none;
 }
 
-.hermine-exact-slider {
+.hermione-exact-slider {
   flex: 1;
   cursor: pointer;
 }
 
-.hermine-exact-validation {
+.hermione-exact-validation {
   font-size: var(--font-ui-small);
   margin-bottom: 1em;
   min-height: 1.2em;
 }
 
 /* Error flash animation */
-.hermine-error-flash {
+.hermione-error-flash {
   animation: error-flash 0.5s ease;
 }
 
@@ -846,34 +896,34 @@
 }
 
 /* Settings page styles */
-.hermine-settings-usage {
+.hermione-settings-usage {
   background-color: var(--background-secondary);
   padding: 1em;
   border-radius: var(--radius-m);
   margin-top: 1em;
 }
 
-.hermine-settings-usage pre {
+.hermione-settings-usage pre {
   background-color: var(--background-primary);
   padding: 0.75em;
   border-radius: var(--radius-s);
   overflow-x: auto;
 }
 
-.hermine-settings-usage code {
+.hermione-settings-usage code {
   font-size: var(--font-ui-smaller);
 }
 
-.hermine-settings-usage h4 {
+.hermione-settings-usage h4 {
   margin-top: 1em;
   margin-bottom: 0.5em;
 }
 
-.hermine-settings-usage ul {
+.hermione-settings-usage ul {
   padding-left: 1.5em;
 }
 
-.hermine-settings-usage li {
+.hermione-settings-usage li {
   margin: 0.25em 0;
 }
 
@@ -883,7 +933,7 @@
    soft borders, glow accents.
    ========================================== */
 
-.hermine-theme-glass .hermine-errors {
+.hermione-theme-glass .hermione-errors {
   background: rgba(255, 80, 80, 0.12);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -891,7 +941,7 @@
   border-radius: 12px;
 }
 
-.hermine-theme-glass .hermine-empty {
+.hermione-theme-glass .hermione-empty {
   background: rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -899,8 +949,8 @@
   border-radius: 16px;
 }
 
-.hermine-theme-glass .hermine-table,
-.hermine-theme-glass .hermine-matrix {
+.hermione-theme-glass .hermione-table,
+.hermione-theme-glass .hermione-matrix {
   border-collapse: separate;
   border-spacing: 0;
   background: rgba(255, 255, 255, 0.03);
@@ -911,36 +961,36 @@
   overflow: hidden;
 }
 
-.hermine-theme-glass .hermine-table th,
-.hermine-theme-glass .hermine-table td,
-.hermine-theme-glass .hermine-matrix th,
-.hermine-theme-glass .hermine-matrix td {
+.hermione-theme-glass .hermione-table th,
+.hermione-theme-glass .hermione-table td,
+.hermione-theme-glass .hermione-matrix th,
+.hermione-theme-glass .hermione-matrix td {
   border: none;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.hermine-theme-glass .hermine-table th,
-.hermine-theme-glass .hermine-matrix th {
+.hermione-theme-glass .hermione-table th,
+.hermione-theme-glass .hermione-matrix th {
   background: rgba(255, 255, 255, 0.06);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
 
-.hermine-theme-glass .hermine-table tbody tr:hover,
-.hermine-theme-glass .hermine-matrix tbody tr:hover {
+.hermione-theme-glass .hermione-table tbody tr:hover,
+.hermione-theme-glass .hermione-matrix tbody tr:hover {
   background: rgba(255, 255, 255, 0.04);
 }
 
 /* Glass axis labels */
-.hermine-theme-glass .hermine-axis-label-y span,
-.hermine-theme-glass .hermine-axis-label-x span {
+.hermione-theme-glass .hermione-axis-label-y span,
+.hermione-theme-glass .hermione-axis-label-x span {
   text-transform: uppercase;
   letter-spacing: 0.1em;
   opacity: 0.7;
 }
 
 /* Glass board */
-.hermine-theme-glass .hermine-board {
+.hermione-theme-glass .hermione-board {
   padding: 12px;
   background: rgba(255, 255, 255, 0.03);
   backdrop-filter: blur(16px);
@@ -951,7 +1001,7 @@
 }
 
 /* Glass headers */
-.hermine-theme-glass .hermine-board-header-x {
+.hermione-theme-glass .hermione-board-header-x {
   background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.2);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -960,7 +1010,7 @@
   border: 1px solid rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.25);
 }
 
-.hermine-theme-glass .hermine-board-header-y {
+.hermione-theme-glass .hermione-board-header-y {
   background: rgba(255, 255, 255, 0.06);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -969,20 +1019,20 @@
 }
 
 /* Glass cells */
-.hermine-theme-glass .hermine-board-cell {
+.hermione-theme-glass .hermione-board-cell {
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 12px;
   transition: all 0.25s ease;
 }
 
-.hermine-theme-glass .hermine-board-cell:hover {
+.hermione-theme-glass .hermione-board-cell:hover {
   border-color: rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.05);
 }
 
 /* Glass cards */
-.hermine-theme-glass .hermine-card {
+.hermione-theme-glass .hermione-card {
   background: rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -993,27 +1043,27 @@
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
-.hermine-theme-glass .hermine-card:hover {
+.hermione-theme-glass .hermione-card:hover {
   transform: translateY(-3px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12),
               inset 0 1px 0 rgba(255, 255, 255, 0.1);
   border-color: rgba(255, 255, 255, 0.2);
 }
 
-.hermine-theme-glass .hermine-card.hermine-card-dragging {
+.hermione-theme-glass .hermione-card.hermione-card-dragging {
   opacity: 0.5;
   transform: rotate(2deg) scale(1.02);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
 }
 
 /* Glass drop zone states */
-.hermine-theme-glass .hermine-board-cell.hermine-drop-zone-active {
+.hermione-theme-glass .hermione-board-cell.hermione-drop-zone-active {
   border-color: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.4);
   background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.06);
   box-shadow: inset 0 0 20px rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.05);
 }
 
-.hermine-theme-glass .hermine-board-cell.hermine-drop-zone-hover {
+.hermione-theme-glass .hermione-board-cell.hermione-drop-zone-hover {
   background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.12) !important;
   border-color: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.5) !important;
   box-shadow: 0 0 24px rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.15),
@@ -1022,29 +1072,29 @@
 }
 
 /* Glass dot wrapper */
-.hermine-theme-glass .hermine-dot-wrapper:hover {
+.hermione-theme-glass .hermione-dot-wrapper:hover {
   background: rgba(255, 255, 255, 0.06);
 }
 
 /* Glass general drop zone */
-.hermine-theme-glass .hermine-drop-zone-active {
+.hermione-theme-glass .hermione-drop-zone-active {
   background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.06);
 }
 
-.hermine-theme-glass .hermine-drop-zone-hover {
+.hermione-theme-glass .hermione-drop-zone-hover {
   background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.15) !important;
   opacity: 1;
 }
 
 /* Glass preview */
-.hermine-theme-glass ~ .hermine-preview,
-.hermine-preview {
+.hermione-theme-glass ~ .hermione-preview,
+.hermione-preview {
   /* Preview is attached to body, so theme-glass scoping doesn't reach it.
      Glass styling for preview requires a body-level class or JS. Kept as-is. */
 }
 
 /* Glass unassigned */
-.hermine-theme-glass .hermine-unassigned {
+.hermione-theme-glass .hermione-unassigned {
   background: rgba(255, 255, 255, 0.03);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -1053,12 +1103,12 @@
 }
 
 /* Glass editable */
-.hermine-theme-glass .hermine-value-display:hover {
+.hermione-theme-glass .hermione-value-display:hover {
   background: rgba(255, 255, 255, 0.06);
   border-radius: 6px;
 }
 
-.hermine-theme-glass .hermine-value-input {
+.hermione-theme-glass .hermione-value-input {
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.04);
@@ -1066,26 +1116,26 @@
   -webkit-backdrop-filter: blur(8px);
 }
 
-.hermine-theme-glass .hermine-value-input:focus {
+.hermione-theme-glass .hermione-value-input:focus {
   border-color: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.6);
   box-shadow: 0 0 0 3px rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.15);
 }
 
 /* Glass buttons */
-.hermine-theme-glass .hermine-edit-btn:hover {
+.hermione-theme-glass .hermione-edit-btn:hover {
   background: rgba(255, 255, 255, 0.08);
 }
 
-.hermine-theme-glass .hermine-save-btn:hover {
+.hermione-theme-glass .hermione-save-btn:hover {
   background: rgba(0, 200, 100, 0.12);
 }
 
-.hermine-theme-glass .hermine-cancel-btn:hover {
+.hermione-theme-glass .hermione-cancel-btn:hover {
   background: rgba(255, 80, 80, 0.12);
 }
 
 /* Glass zoom controls */
-.hermine-theme-glass .hermine-zoom-controls {
+.hermione-theme-glass .hermione-zoom-controls {
   background: rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -1093,23 +1143,23 @@
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.hermine-theme-glass .hermine-zoom-btn:hover {
+.hermione-theme-glass .hermione-zoom-btn:hover {
   background: rgba(255, 255, 255, 0.08);
 }
 
-.hermine-theme-glass .hermine-zoom-display {
+.hermione-theme-glass .hermione-zoom-display {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
 }
 
-.hermine-theme-glass .hermine-zoom-display:hover {
+.hermione-theme-glass .hermione-zoom-display:hover {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.15);
 }
 
 /* Glass refresh button */
-.hermine-theme-glass .hermine-refresh-btn {
+.hermione-theme-glass .hermione-refresh-btn {
   background: rgba(255, 255, 255, 0.06);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -1117,13 +1167,13 @@
   border-radius: 10px;
 }
 
-.hermine-theme-glass .hermine-refresh-btn:hover {
+.hermione-theme-glass .hermione-refresh-btn:hover {
   background: rgba(255, 255, 255, 0.1);
   border-color: rgba(255, 255, 255, 0.18);
 }
 
 /* Glass error flash */
-.hermine-theme-glass .hermine-error-flash {
+.hermione-theme-glass .hermione-error-flash {
   animation: error-flash-glass 0.5s ease;
 }
 
@@ -1133,7 +1183,7 @@
 }
 
 /* Glass settings */
-.hermine-theme-glass .hermine-settings-usage {
+.hermione-theme-glass .hermione-settings-usage {
   background: rgba(255, 255, 255, 0.03);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -1141,67 +1191,67 @@
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.hermine-theme-glass .hermine-settings-usage pre {
+.hermione-theme-glass .hermione-settings-usage pre {
   background: rgba(0, 0, 0, 0.15);
   border-radius: 8px;
 }
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
-  .hermine-table,
-  .hermine-matrix {
+  .hermione-table,
+  .hermione-matrix {
     font-size: var(--font-ui-smaller);
   }
 
-  .hermine-table th,
-  .hermine-table td,
-  .hermine-matrix th,
-  .hermine-matrix td {
+  .hermione-table th,
+  .hermione-table td,
+  .hermione-matrix th,
+  .hermione-matrix td {
     padding: 0.375em 0.5em;
   }
 
-  .hermine-editable-wrapper {
+  .hermione-editable-wrapper {
     flex-wrap: wrap;
   }
 
-  .hermine-value-input {
+  .hermione-value-input {
     width: 100%;
     min-width: auto;
   }
 
-  .hermine-dot {
+  .hermione-dot {
     width: 16px;
     height: 16px;
   }
 
-  .hermine-preview {
+  .hermione-preview {
     width: 300px;
     max-height: 250px;
   }
 
   /* Board responsive */
-  .hermine-board {
+  .hermione-board {
     gap: 6px;
     padding: 6px;
   }
 
-  .hermine-board-cell {
+  .hermione-board-cell {
     min-width: 120px;
     min-height: 80px;
     padding: 6px;
   }
 
-  .hermine-board-header-x,
-  .hermine-board-header-y {
+  .hermione-board-header-x,
+  .hermione-board-header-y {
     padding: 8px 10px;
     font-size: var(--font-ui-smaller);
   }
 
-  .hermine-card-content {
+  .hermione-card-content {
     padding: 6px 8px;
   }
 
-  .hermine-card-title {
+  .hermione-card-title {
     font-size: var(--font-ui-smaller);
   }
 }

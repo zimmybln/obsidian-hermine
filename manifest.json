@@ -1,6 +1,6 @@
 {
-  "id": "obsidian-hermine",
-  "name": "Hermine",
+  "id": "obsidian-hermione",
+  "name": "Hermione",
   "version": "1.0.0",
   "minAppVersion": "1.0.0",
   "description": "Query document properties and display them in an editable matrix view with X and Y axes.",

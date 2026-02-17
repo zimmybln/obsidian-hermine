@@ -6,17 +6,17 @@ export function compileTransform(expr: string): ((value: any) => any) | null {
   try {
     const trimmed = expr.trim();
     if (!trimmed.startsWith("(")) {
-      console.error("Hermine: Transform must be an arrow function, e.g. (v) => ...");
+      console.error("Hermione: Transform must be an arrow function, e.g. (v) => ...");
       return null;
     }
     const fn = new Function(`"use strict"; return (${trimmed});`)();
     if (typeof fn !== "function") {
-      console.error("Hermine: Transform did not evaluate to a function");
+      console.error("Hermione: Transform did not evaluate to a function");
       return null;
     }
     return fn;
   } catch (e) {
-    console.error("Hermine: Failed to compile transform:", e);
+    console.error("Hermione: Failed to compile transform:", e);
     return null;
   }
 }
@@ -33,7 +33,7 @@ export function applyTransform(
   try {
     return transformFn(rawValue);
   } catch (e) {
-    console.error("Hermine: Transform execution error for value", rawValue, e);
+    console.error("Hermione: Transform execution error for value", rawValue, e);
     return rawValue;
   }
 }

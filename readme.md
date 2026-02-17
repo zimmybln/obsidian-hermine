@@ -10,7 +10,7 @@ Achsen können folgende Eigenschaften definieren:
 4. Nur-Lesen: Dann lassen sich Karten auf dieser Achse nicht verschieben
 
 
-```hermine
+```hermione
 ...
 y-werte: Nicht wichtig, mittel wichtig, wichtig, dringlich
 y-achse: Dringlichkeit
@@ -53,3 +53,6 @@ filter: (docs) => docs.filter(d => d.properties.punkte > 10)
 
 filter: (docs) => docs.filter(d => d.name.startsWith("2024"))
 Jedes Dokument-Objekt hat folgende Felder: file (TFile), path, name und properties (alle Frontmatter-Eigenschaften als Key-Value-Paare).
+
+
+row-height: flexible | static

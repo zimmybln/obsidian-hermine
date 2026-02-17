@@ -1,5 +1,5 @@
 import { App, TFile, TFolder, CachedMetadata, getAllTags } from "obsidian";
-import { HermineConfig, DocumentData, QueryResult } from "./types";
+import { HermioneConfig, DocumentData, QueryResult } from "./types";
 import { compileTransform, applyTransform } from "./value-transform";
 
 /**
@@ -12,7 +12,7 @@ export class QueryEngine {
   /**
    * Execute a query and return matching documents
    */
-  async execute(config: HermineConfig): Promise<QueryResult> {
+  async execute(config: HermioneConfig): Promise<QueryResult> {
     const result: QueryResult = {
       documents: [],
       xAxisValues: new Set(),

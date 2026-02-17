@@ -24,7 +24,7 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // src/main.ts
 var main_exports = {};
 __export(main_exports, {
-  default: () => HerminePlugin
+  default: () => HermionePlugin
 });
 module.exports = __toCommonJS(main_exports);
 var import_obsidian5 = require("obsidian");
@@ -41,7 +41,9 @@ var FUNCTION_KEYS = /* @__PURE__ */ new Set([
   "xtransform",
   "y-transform",
   "y-transformation",
-  "ytransform"
+  "ytransform",
+  "filter",
+  "filtern"
 ]);
 function unclosedBraces(str) {
   let depth = 0;
@@ -85,7 +87,7 @@ function parseAxisValues(value) {
     exact
   };
 }
-function parseHermineBlock(content) {
+function parseHermioneBlock(content) {
   var _a;
   const lines = content.trim().split("\n");
   const config = {};
@@ -236,6 +238,33 @@ function parseHermineBlock(content) {
       case "hideunassigned":
         config.hideUnassigned = value.toLowerCase() !== "false" && value !== "0";
         break;
+      case "row-height":
+      case "zeilenhoehe":
+      case "zeilenh\xF6he":
+      case "rowheight":
+        {
+          const v = value.toLowerCase();
+          if (v === "flexible" || v === "flexibel" || v === "auto") {
+            config.rowHeight = "flexible";
+          } else {
+            config.rowHeight = "static";
+          }
+        }
+        break;
+      case "preview":
+      case "vorschau":
+      case "tooltip":
+        {
+          const v = value.toLowerCase();
+          if (v === "achsen" || v === "axes" || v === "axis") {
+            config.preview = "axes";
+          } else if (v === "eigenschaften" || v === "properties" || v === "alle" || v === "all") {
+            config.preview = "properties";
+          } else {
+            config.preview = "document";
+          }
+        }
+        break;
     }
   }
   if (!config.source) {
@@ -255,17 +284,17 @@ function compileTransform(expr) {
   try {
     const trimmed = expr.trim();
     if (!trimmed.startsWith("(")) {
-      console.error("Hermine: Transform must be an arrow function, e.g. (v) => ...");
+      console.error("Hermione: Transform must be an arrow function, e.g. (v) => ...");
       return null;
     }
     const fn = new Function(`"use strict"; return (${trimmed});`)();
     if (typeof fn !== "function") {
-      console.error("Hermine: Transform did not evaluate to a function");
+      console.error("Hermione: Transform did not evaluate to a function");
       return null;
     }
     return fn;
   } catch (e) {
-    console.error("Hermine: Failed to compile transform:", e);
+    console.error("Hermione: Failed to compile transform:", e);
     return null;
   }
 }
@@ -275,7 +304,7 @@ function applyTransform(rawValue, transformFn) {
   try {
     return transformFn(rawValue);
   } catch (e) {
-    console.error("Hermine: Transform execution error for value", rawValue, e);
+    console.error("Hermione: Transform execution error for value", rawValue, e);
     return rawValue;
   }
 }
@@ -710,32 +739,32 @@ var ValuePickerModal = class extends import_obsidian2.Modal {
   }
   onOpen() {
     const { contentEl } = this;
-    contentEl.addClass("hermine-value-picker-modal");
+    contentEl.addClass("hermione-value-picker-modal");
     contentEl.createEl("h3", {
       text: `Wert f\xFCr "${this.axisName}" w\xE4hlen`
     });
     contentEl.createEl("p", {
-      cls: "hermine-picker-info",
+      cls: "hermione-picker-info",
       text: `Zielgruppe: ${this.groupLabel}`
     });
-    const inputContainer = contentEl.createDiv({ cls: "hermine-picker-input-container" });
+    const inputContainer = contentEl.createDiv({ cls: "hermione-picker-input-container" });
     const input = inputContainer.createEl("input", {
-      cls: "hermine-picker-input",
+      cls: "hermione-picker-input",
       type: "text",
       placeholder: "Wert eingeben..."
     });
     input.focus();
-    const validation = contentEl.createDiv({ cls: "hermine-picker-validation" });
+    const validation = contentEl.createDiv({ cls: "hermione-picker-validation" });
     if (this.existingValues.length > 0) {
-      const suggestionsContainer = contentEl.createDiv({ cls: "hermine-picker-suggestions" });
+      const suggestionsContainer = contentEl.createDiv({ cls: "hermione-picker-suggestions" });
       suggestionsContainer.createEl("span", {
-        cls: "hermine-picker-suggestions-label",
+        cls: "hermione-picker-suggestions-label",
         text: "Vorhandene Werte:"
       });
-      const suggestionsWrapper = suggestionsContainer.createDiv({ cls: "hermine-picker-suggestions-list" });
+      const suggestionsWrapper = suggestionsContainer.createDiv({ cls: "hermione-picker-suggestions-list" });
       for (const val of this.existingValues.sort()) {
         const chip = suggestionsWrapper.createEl("button", {
-          cls: "hermine-picker-chip",
+          cls: "hermione-picker-chip",
           text: String(val)
         });
         chip.addEventListener("click", () => {
@@ -744,21 +773,21 @@ var ValuePickerModal = class extends import_obsidian2.Modal {
         });
       }
     }
-    const buttonContainer = contentEl.createDiv({ cls: "hermine-picker-buttons" });
+    const buttonContainer = contentEl.createDiv({ cls: "hermione-picker-buttons" });
     const confirmBtn = buttonContainer.createEl("button", {
-      cls: "hermine-picker-confirm mod-cta",
+      cls: "hermione-picker-confirm mod-cta",
       text: "\xDCbernehmen"
     });
     confirmBtn.disabled = true;
     const cancelBtn = buttonContainer.createEl("button", {
-      cls: "hermine-picker-cancel",
+      cls: "hermione-picker-cancel",
       text: "Abbrechen"
     });
     const validateInput = () => {
       const raw = input.value.trim();
       if (!raw) {
         validation.textContent = "";
-        validation.className = "hermine-picker-validation";
+        validation.className = "hermione-picker-validation";
         confirmBtn.disabled = true;
         return;
       }
@@ -766,11 +795,11 @@ var ValuePickerModal = class extends import_obsidian2.Modal {
       const transformed = String(applyTransform(parsed, this.transformFn));
       if (transformed === this.groupLabel) {
         validation.textContent = `\u2713 Wert ${raw} \u2192 Gruppe "${transformed}"`;
-        validation.className = "hermine-picker-validation hermine-picker-valid";
+        validation.className = "hermione-picker-validation hermione-picker-valid";
         confirmBtn.disabled = false;
       } else {
         validation.textContent = `\u2717 Wert ${raw} geh\xF6rt zu Gruppe "${transformed}", nicht "${this.groupLabel}"`;
-        validation.className = "hermine-picker-validation hermine-picker-invalid";
+        validation.className = "hermione-picker-validation hermione-picker-invalid";
         confirmBtn.disabled = true;
       }
     };
@@ -831,17 +860,17 @@ var ExactValueModal = class extends import_obsidian3.Modal {
   }
   onOpen() {
     const { contentEl } = this;
-    contentEl.addClass("hermine-exact-modal");
+    contentEl.addClass("hermione-exact-modal");
     contentEl.createEl("h3", {
       text: `Exakter Wert f\xFCr "${this.axisName}"`
     });
     contentEl.createEl("p", {
-      cls: "hermine-exact-info",
+      cls: "hermione-exact-info",
       text: `Bereich: ${this.rangeMin} \u2013 ${this.rangeMax}`
     });
-    const inputRow = contentEl.createDiv({ cls: "hermine-exact-input-row" });
+    const inputRow = contentEl.createDiv({ cls: "hermione-exact-input-row" });
     const input = inputRow.createEl("input", {
-      cls: "hermine-exact-input",
+      cls: "hermione-exact-input",
       type: "number"
     });
     input.min = String(this.rangeMin);
@@ -849,7 +878,7 @@ var ExactValueModal = class extends import_obsidian3.Modal {
     input.value = String(this.cellValue);
     input.step = "1";
     const slider = inputRow.createEl("input", {
-      cls: "hermine-exact-slider",
+      cls: "hermione-exact-slider",
       type: "range"
     });
     slider.min = String(this.rangeMin);
@@ -864,30 +893,30 @@ var ExactValueModal = class extends import_obsidian3.Modal {
       input.value = slider.value;
       updateValidation();
     });
-    const validation = contentEl.createDiv({ cls: "hermine-exact-validation" });
+    const validation = contentEl.createDiv({ cls: "hermione-exact-validation" });
     const updateValidation = () => {
       const num = parseFloat(input.value);
       if (isNaN(num)) {
         validation.textContent = "Bitte eine Zahl eingeben";
-        validation.className = "hermine-exact-validation hermine-picker-invalid";
+        validation.className = "hermione-exact-validation hermione-picker-invalid";
         confirmBtn.disabled = true;
       } else if (num < this.rangeMin || num > this.rangeMax) {
         validation.textContent = `Wert muss zwischen ${this.rangeMin} und ${this.rangeMax} liegen`;
-        validation.className = "hermine-exact-validation hermine-picker-invalid";
+        validation.className = "hermione-exact-validation hermione-picker-invalid";
         confirmBtn.disabled = true;
       } else {
         validation.textContent = `Wert: ${num}`;
-        validation.className = "hermine-exact-validation hermine-picker-valid";
+        validation.className = "hermione-exact-validation hermione-picker-valid";
         confirmBtn.disabled = false;
       }
     };
-    const buttonContainer = contentEl.createDiv({ cls: "hermine-picker-buttons" });
+    const buttonContainer = contentEl.createDiv({ cls: "hermione-picker-buttons" });
     const confirmBtn = buttonContainer.createEl("button", {
-      cls: "hermine-picker-confirm mod-cta",
+      cls: "hermione-picker-confirm mod-cta",
       text: "\xDCbernehmen"
     });
     const cancelBtn = buttonContainer.createEl("button", {
-      cls: "hermine-picker-cancel",
+      cls: "hermione-picker-cancel",
       text: "Abbrechen"
     });
     const confirm = () => {
@@ -966,13 +995,16 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
    */
   render() {
     this.containerEl.empty();
-    this.containerEl.addClass("hermine-container");
+    this.containerEl.addClass("hermione-container");
     if (this.config.theme) {
-      this.containerEl.addClass(`hermine-theme-${this.config.theme}`);
+      this.containerEl.addClass(`hermione-theme-${this.config.theme}`);
+    }
+    if (this.config.rowHeight === "flexible") {
+      this.containerEl.addClass("hermione-rows-flexible");
     }
     if (this.config.title) {
       this.containerEl.createEl("h3", {
-        cls: "hermine-title",
+        cls: "hermione-title",
         text: this.config.title
       });
     }
@@ -994,9 +1026,9 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
    * Render error messages
    */
   renderErrors() {
-    const errorContainer = this.containerEl.createDiv({ cls: "hermine-errors" });
+    const errorContainer = this.containerEl.createDiv({ cls: "hermione-errors" });
     for (const error of this.result.errors) {
-      errorContainer.createDiv({ cls: "hermine-error", text: error });
+      errorContainer.createDiv({ cls: "hermione-error", text: error });
     }
   }
   /**
@@ -1004,7 +1036,7 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
    */
   renderEmptyState() {
     this.containerEl.createDiv({
-      cls: "hermine-empty",
+      cls: "hermione-empty",
       text: "Keine Dokumente gefunden."
     });
   }
@@ -1012,7 +1044,7 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
    * Render a simple table (X-axis only)
    */
   renderTable() {
-    const table = this.containerEl.createEl("table", { cls: "hermine-table" });
+    const table = this.containerEl.createEl("table", { cls: "hermione-table" });
     const thead = table.createEl("thead");
     const headerRow = thead.createEl("tr");
     headerRow.createEl("th", { text: "Dokument" });
@@ -1025,7 +1057,7 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
     const tbody = table.createEl("tbody");
     for (const doc of this.result.documents) {
       const row = tbody.createEl("tr");
-      const nameCell = row.createEl("td", { cls: "hermine-cell-name" });
+      const nameCell = row.createEl("td", { cls: "hermione-cell-name" });
       const link = nameCell.createEl("a", {
         cls: "internal-link",
         text: doc.name
@@ -1035,12 +1067,12 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
         this.app.workspace.openLinkText(doc.path, "");
       });
       const xValue = this.getPropertyValue(doc.properties, this.config.xAxis);
-      const xCell = row.createEl("td", { cls: "hermine-cell-editable" });
+      const xCell = row.createEl("td", { cls: "hermione-cell-editable" });
       this.renderEditableCell(xCell, doc, this.config.xAxis, xValue);
       if (this.config.display) {
         for (const prop of this.config.display) {
           const value = this.getPropertyValue(doc.properties, prop);
-          const cell = row.createEl("td", { cls: "hermine-cell-editable" });
+          const cell = row.createEl("td", { cls: "hermione-cell-editable" });
           this.renderEditableCell(cell, doc, prop, value);
         }
       }
@@ -1053,12 +1085,12 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
   renderMatrix() {
     const xValues = this.config.xValues ? this.config.xValues : Array.from(this.result.xAxisValues).sort();
     const yValues = this.config.yValues ? this.config.yValues : Array.from(this.result.yAxisValues).sort();
-    const boardLayout = this.containerEl.createDiv({ cls: "hermine-board-layout" });
+    const boardLayout = this.containerEl.createDiv({ cls: "hermione-board-layout" });
     if (this.config.yLabel) {
-      const yLabelEl = boardLayout.createDiv({ cls: "hermine-axis-label-y" });
+      const yLabelEl = boardLayout.createDiv({ cls: "hermione-axis-label-y" });
       yLabelEl.createSpan({ text: this.config.yLabel });
     }
-    const zoomWrapper = boardLayout.createDiv({ cls: "hermine-zoom-wrapper" });
+    const zoomWrapper = boardLayout.createDiv({ cls: "hermione-zoom-wrapper" });
     zoomWrapper.addEventListener("wheel", (e) => {
       if (e.ctrlKey) {
         e.preventDefault();
@@ -1069,20 +1101,20 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
         }
       }
     }, { passive: false });
-    const board = zoomWrapper.createDiv({ cls: "hermine-board" });
+    const board = zoomWrapper.createDiv({ cls: "hermione-board" });
     this.boardEl = board;
     board.style.gridTemplateColumns = `auto repeat(${xValues.length}, 1fr)`;
     this.applyZoom();
-    const corner = board.createDiv({ cls: "hermine-board-corner" });
+    const corner = board.createDiv({ cls: "hermione-board-corner" });
     for (const xVal of xValues) {
-      const xHeader = board.createDiv({ cls: "hermine-board-header-x" });
+      const xHeader = board.createDiv({ cls: "hermione-board-header-x" });
       xHeader.createSpan({ text: String(xVal) });
     }
     for (const yVal of yValues) {
-      const yHeader = board.createDiv({ cls: "hermine-board-header-y" });
+      const yHeader = board.createDiv({ cls: "hermione-board-header-y" });
       yHeader.createSpan({ text: String(yVal) });
       for (const xVal of xValues) {
-        const cell = board.createDiv({ cls: "hermine-board-cell" });
+        const cell = board.createDiv({ cls: "hermione-board-cell" });
         cell.dataset.xValue = String(xVal);
         cell.dataset.yValue = String(yVal);
         this.setupDropZone(cell, xVal, yVal, xValues, yValues);
@@ -1094,7 +1126,7 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
           return xMatch && yMatch;
         });
         if (matchingDocs.length > 0) {
-          const dotsContainer = cell.createDiv({ cls: "hermine-board-items" });
+          const dotsContainer = cell.createDiv({ cls: "hermione-board-items" });
           for (const doc of matchingDocs) {
             this.renderDocumentCard(dotsContainer, doc);
           }
@@ -1103,7 +1135,7 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
     }
     if (this.config.xLabel) {
       board.createDiv();
-      const xLabelEl = board.createDiv({ cls: "hermine-axis-label-x" });
+      const xLabelEl = board.createDiv({ cls: "hermione-axis-label-x" });
       xLabelEl.style.gridColumn = `span ${xValues.length}`;
       xLabelEl.createSpan({ text: this.config.xLabel });
     }
@@ -1121,8 +1153,8 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
     const transformFn = isYOnly ? this.yTransformFn : this.xTransformFn;
     const isExact = isYOnly ? !!this.config.yExact : !!this.config.xExact;
     const axisLabel = isYOnly ? this.config.yLabel || this.config.xLabel : this.config.xLabel || this.config.yLabel;
-    const boardLayout = this.containerEl.createDiv({ cls: "hermine-board-layout" });
-    const zoomWrapper = boardLayout.createDiv({ cls: "hermine-zoom-wrapper" });
+    const boardLayout = this.containerEl.createDiv({ cls: "hermione-board-layout" });
+    const zoomWrapper = boardLayout.createDiv({ cls: "hermione-zoom-wrapper" });
     zoomWrapper.addEventListener("wheel", (e) => {
       if (e.ctrlKey) {
         e.preventDefault();
@@ -1132,15 +1164,15 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
           this.zoomOut();
       }
     }, { passive: false });
-    const board = zoomWrapper.createDiv({ cls: "hermine-board hermine-board-single-axis" });
+    const board = zoomWrapper.createDiv({ cls: "hermione-board hermione-board-single-axis" });
     this.boardEl = board;
     if (isYOnly) {
       board.style.gridTemplateColumns = `auto 1fr`;
       this.applyZoom();
       for (const val of axisValues) {
-        const header = board.createDiv({ cls: "hermine-board-header-y" });
+        const header = board.createDiv({ cls: "hermione-board-header-y" });
         header.createSpan({ text: String(val) });
-        const cell = board.createDiv({ cls: "hermine-board-cell hermine-board-cell-horizontal" });
+        const cell = board.createDiv({ cls: "hermione-board-cell hermione-board-cell-horizontal" });
         cell.dataset.yValue = String(val);
         this.setupDropZone(cell, void 0, val, [], axisValues);
         const matchingDocs = this.result.documents.filter((doc) => {
@@ -1148,14 +1180,14 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
           return Array.isArray(raw) ? raw.some((v) => this.matchesCellValue(v, val, transformFn, isExact, axisValues)) : this.matchesCellValue(raw, val, transformFn, isExact, axisValues);
         });
         if (matchingDocs.length > 0) {
-          const items = cell.createDiv({ cls: "hermine-board-items hermine-board-items-horizontal" });
+          const items = cell.createDiv({ cls: "hermione-board-items hermione-board-items-horizontal" });
           for (const doc of matchingDocs) {
             this.renderDocumentCard(items, doc);
           }
         }
       }
       if (axisLabel) {
-        const labelEl = board.createDiv({ cls: "hermine-axis-label-y-bottom" });
+        const labelEl = board.createDiv({ cls: "hermione-axis-label-y-bottom" });
         labelEl.style.gridColumn = "span 2";
         labelEl.createSpan({ text: axisLabel });
       }
@@ -1163,11 +1195,11 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
       board.style.gridTemplateColumns = `repeat(${axisValues.length}, 1fr)`;
       this.applyZoom();
       for (const val of axisValues) {
-        const header = board.createDiv({ cls: "hermine-board-header-x" });
+        const header = board.createDiv({ cls: "hermione-board-header-x" });
         header.createSpan({ text: String(val) });
       }
       for (const val of axisValues) {
-        const cell = board.createDiv({ cls: "hermine-board-cell" });
+        const cell = board.createDiv({ cls: "hermione-board-cell" });
         cell.dataset.xValue = String(val);
         this.setupDropZone(cell, val, void 0, axisValues, []);
         const matchingDocs = this.result.documents.filter((doc) => {
@@ -1175,14 +1207,14 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
           return Array.isArray(raw) ? raw.some((v) => this.matchesCellValue(v, val, transformFn, isExact, axisValues)) : this.matchesCellValue(raw, val, transformFn, isExact, axisValues);
         });
         if (matchingDocs.length > 0) {
-          const items = cell.createDiv({ cls: "hermine-board-items" });
+          const items = cell.createDiv({ cls: "hermione-board-items" });
           for (const doc of matchingDocs) {
             this.renderDocumentCard(items, doc);
           }
         }
       }
       if (axisLabel) {
-        const labelEl = board.createDiv({ cls: "hermine-axis-label-x" });
+        const labelEl = board.createDiv({ cls: "hermione-axis-label-x" });
         labelEl.style.gridColumn = `span ${axisValues.length}`;
         labelEl.createSpan({ text: axisLabel });
       }
@@ -1198,9 +1230,9 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
    * Render a document as a draggable card for the board view
    */
   renderDocumentCard(container, doc) {
-    const card = container.createDiv({ cls: "hermine-card" });
+    const card = container.createDiv({ cls: "hermione-card" });
     const cardStyle = this.evaluateCardStyle(doc);
-    const colorBar = card.createDiv({ cls: "hermine-card-color" });
+    const colorBar = card.createDiv({ cls: "hermione-card-color" });
     colorBar.style.backgroundColor = cardStyle.color || this.getDocumentColor(doc.name);
     if (cardStyle.background) {
       card.style.backgroundColor = cardStyle.background;
@@ -1208,8 +1240,8 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
     if (cardStyle.border) {
       card.style.borderLeft = `3px solid ${cardStyle.border}`;
     }
-    const content = card.createDiv({ cls: "hermine-card-content" });
-    const titleSpan = content.createSpan({ cls: "hermine-card-title", text: doc.name });
+    const content = card.createDiv({ cls: "hermione-card-content" });
+    const titleSpan = content.createSpan({ cls: "hermione-card-title", text: doc.name });
     if (cardStyle.textColor) {
       titleSpan.style.color = cardStyle.textColor;
     }
@@ -1228,29 +1260,29 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
         return;
       }
       this.currentDragDoc = doc;
-      card.addClass("hermine-card-dragging");
+      card.addClass("hermione-card-dragging");
       (_a = e.dataTransfer) == null ? void 0 : _a.setData("text/plain", doc.path);
       const docX = this.config.xAxis ? this.getPropertyValue(doc.properties, this.config.xAxis) : void 0;
       const docY = this.config.yAxis ? this.getPropertyValue(doc.properties, this.config.yAxis) : void 0;
       const docXStr = docX !== void 0 ? String(applyTransform(docX, this.xTransformFn)) : void 0;
       const docYStr = docY !== void 0 ? String(applyTransform(docY, this.yTransformFn)) : void 0;
-      this.containerEl.querySelectorAll(".hermine-board-cell").forEach((cell) => {
+      this.containerEl.querySelectorAll(".hermione-board-cell").forEach((cell) => {
         const el = cell;
         const cellX = el.dataset.xValue;
         const cellY = el.dataset.yValue;
         const xAllowed = !this.config.xReadonly || cellX === docXStr;
         const yAllowed = !this.config.yReadonly || cellY === docYStr;
         if (xAllowed && yAllowed) {
-          el.addClass("hermine-drop-zone-active");
+          el.addClass("hermione-drop-zone-active");
         }
       });
     });
     card.addEventListener("dragend", () => {
       this.currentDragDoc = null;
-      card.removeClass("hermine-card-dragging");
-      this.containerEl.querySelectorAll(".hermine-board-cell").forEach((cell) => {
-        cell.removeClass("hermine-drop-zone-active");
-        cell.removeClass("hermine-drop-zone-hover");
+      card.removeClass("hermione-card-dragging");
+      this.containerEl.querySelectorAll(".hermione-board-cell").forEach((cell) => {
+        cell.removeClass("hermione-drop-zone-active");
+        cell.removeClass("hermione-drop-zone-hover");
       });
     });
     card.addEventListener("click", (e) => {
@@ -1273,28 +1305,28 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
    * Render a document as a draggable dot with title (for table view)
    */
   renderDocumentDot(container, doc) {
-    const wrapper = container.createDiv({ cls: "hermine-dot-wrapper" });
-    const dot = wrapper.createDiv({ cls: "hermine-dot" });
+    const wrapper = container.createDiv({ cls: "hermione-dot-wrapper" });
+    const dot = wrapper.createDiv({ cls: "hermione-dot" });
     const color = this.getDocumentColor(doc.name);
     dot.style.backgroundColor = color;
-    const title = wrapper.createSpan({ cls: "hermine-dot-title", text: doc.name });
+    const title = wrapper.createSpan({ cls: "hermione-dot-title", text: doc.name });
     wrapper.dataset.docPath = doc.path;
     wrapper.draggable = true;
     wrapper.addEventListener("dragstart", (e) => {
       var _a;
       this.currentDragDoc = doc;
-      wrapper.addClass("hermine-dot-dragging");
+      wrapper.addClass("hermione-dot-dragging");
       (_a = e.dataTransfer) == null ? void 0 : _a.setData("text/plain", doc.path);
-      this.containerEl.querySelectorAll(".hermine-matrix-cell").forEach((cell) => {
-        cell.addClass("hermine-drop-zone-active");
+      this.containerEl.querySelectorAll(".hermione-matrix-cell").forEach((cell) => {
+        cell.addClass("hermione-drop-zone-active");
       });
     });
     wrapper.addEventListener("dragend", () => {
       this.currentDragDoc = null;
-      wrapper.removeClass("hermine-dot-dragging");
-      this.containerEl.querySelectorAll(".hermine-matrix-cell").forEach((cell) => {
-        cell.removeClass("hermine-drop-zone-active");
-        cell.removeClass("hermine-drop-zone-hover");
+      wrapper.removeClass("hermione-dot-dragging");
+      this.containerEl.querySelectorAll(".hermione-matrix-cell").forEach((cell) => {
+        cell.removeClass("hermione-drop-zone-active");
+        cell.removeClass("hermione-drop-zone-hover");
       });
     });
     wrapper.addEventListener("click", (e) => {
@@ -1318,19 +1350,19 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
    */
   setupDropZone(cell, xVal, yVal, allXValues, allYValues) {
     cell.addEventListener("dragover", (e) => {
-      if (!cell.hasClass("hermine-drop-zone-active"))
+      if (!cell.hasClass("hermione-drop-zone-active"))
         return;
       e.preventDefault();
-      cell.addClass("hermine-drop-zone-hover");
+      cell.addClass("hermione-drop-zone-hover");
     });
     cell.addEventListener("dragleave", () => {
-      cell.removeClass("hermine-drop-zone-hover");
+      cell.removeClass("hermione-drop-zone-hover");
     });
     cell.addEventListener("drop", async (e) => {
-      if (!cell.hasClass("hermine-drop-zone-active"))
+      if (!cell.hasClass("hermione-drop-zone-active"))
         return;
       e.preventDefault();
-      cell.removeClass("hermine-drop-zone-hover");
+      cell.removeClass("hermione-drop-zone-hover");
       if (!this.currentDragDoc)
         return;
       const doc = this.currentDragDoc;
@@ -1442,10 +1474,28 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
    */
   async showPreview(doc, event) {
     this.hidePreview();
-    this.previewEl = document.body.createDiv({ cls: "hermine-preview" });
-    const header = this.previewEl.createDiv({ cls: "hermine-preview-header" });
-    header.createSpan({ text: doc.name, cls: "hermine-preview-title" });
-    const content = this.previewEl.createDiv({ cls: "hermine-preview-content" });
+    this.previewEl = document.body.createDiv({ cls: "hermione-preview" });
+    const header = this.previewEl.createDiv({ cls: "hermione-preview-header" });
+    header.createSpan({ text: doc.name, cls: "hermione-preview-title" });
+    const content = this.previewEl.createDiv({ cls: "hermione-preview-content" });
+    const mode = this.config.preview || "document";
+    switch (mode) {
+      case "axes":
+        this.showPreviewAxes(content, doc);
+        break;
+      case "properties":
+        this.showPreviewProperties(content, doc);
+        break;
+      default:
+        await this.showPreviewDocument(content, doc);
+        break;
+    }
+    this.positionPreview(event);
+  }
+  /**
+   * Show document content as rendered markdown preview
+   */
+  async showPreviewDocument(content, doc) {
     try {
       const fileContent = await this.app.vault.read(doc.file);
       const contentWithoutFrontmatter = fileContent.replace(/^---[\s\S]*?---\n?/, "");
@@ -1459,9 +1509,46 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
         new import_obsidian4.Component()
       );
     } catch (error) {
-      content.createSpan({ text: "Vorschau nicht verf\xFCgbar", cls: "hermine-preview-error" });
+      content.createSpan({ text: "Vorschau nicht verf\xFCgbar", cls: "hermione-preview-error" });
     }
-    this.positionPreview(event);
+  }
+  /**
+   * Show axis property values in the preview
+   */
+  showPreviewAxes(content, doc) {
+    const list = content.createDiv({ cls: "hermione-preview-props" });
+    if (this.config.xAxis) {
+      const label = this.config.xLabel || this.config.xAxis;
+      const value = this.getPropertyValue(doc.properties, this.config.xAxis);
+      this.renderPreviewProp(list, label, value);
+    }
+    if (this.config.yAxis) {
+      const label = this.config.yLabel || this.config.yAxis;
+      const value = this.getPropertyValue(doc.properties, this.config.yAxis);
+      this.renderPreviewProp(list, label, value);
+    }
+  }
+  /**
+   * Show all user-defined frontmatter properties in the preview
+   */
+  showPreviewProperties(content, doc) {
+    const list = content.createDiv({ cls: "hermione-preview-props" });
+    const skipKeys = /* @__PURE__ */ new Set(["position", "file.name", "file.path", "file.ctime", "file.mtime", "file.size", "file.tags"]);
+    for (const [key, value] of Object.entries(doc.properties)) {
+      if (skipKeys.has(key) || key.startsWith("file."))
+        continue;
+      if (typeof value === "object" && value !== null && !Array.isArray(value) && "start" in value && "end" in value)
+        continue;
+      this.renderPreviewProp(list, key, value);
+    }
+  }
+  /**
+   * Render a single key-value pair in the preview
+   */
+  renderPreviewProp(container, key, value) {
+    const row = container.createDiv({ cls: "hermione-preview-prop" });
+    row.createSpan({ cls: "hermione-preview-prop-key", text: key });
+    row.createSpan({ cls: "hermione-preview-prop-value", text: this.formatDisplayValue(value) });
   }
   /**
    * Position the preview near the cursor
@@ -1595,7 +1682,7 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
         };
       }
     } catch (e) {
-      console.error("Hermine: card-style evaluation error for", doc.name, e);
+      console.error("Hermione: card-style evaluation error for", doc.name, e);
     }
     return {};
   }
@@ -1645,9 +1732,9 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
     });
     if (unassigned.length === 0)
       return;
-    const section = this.containerEl.createDiv({ cls: "hermine-unassigned" });
+    const section = this.containerEl.createDiv({ cls: "hermione-unassigned" });
     section.createEl("strong", { text: "Nicht zugeordnet:" });
-    const items = section.createDiv({ cls: "hermine-unassigned-items" });
+    const items = section.createDiv({ cls: "hermione-unassigned-items" });
     for (const doc of unassigned) {
       this.renderDocumentCard(items, doc);
     }
@@ -1657,32 +1744,32 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
    */
   renderEditableCell(container, doc, propertyName, value, compact = false) {
     const displayValue = this.formatDisplayValue(value);
-    const wrapper = container.createDiv({ cls: "hermine-editable-wrapper" });
+    const wrapper = container.createDiv({ cls: "hermione-editable-wrapper" });
     const display = wrapper.createSpan({
-      cls: "hermine-value-display",
+      cls: "hermione-value-display",
       text: displayValue
     });
     const input = wrapper.createEl("input", {
-      cls: "hermine-value-input",
+      cls: "hermione-value-input",
       type: "text",
       value: displayValue
     });
     input.style.display = "none";
     if (compact) {
       const label = wrapper.createSpan({
-        cls: "hermine-prop-label",
+        cls: "hermione-prop-label",
         text: `${propertyName}: `
       });
       wrapper.insertBefore(label, display);
     }
-    const editBtn = wrapper.createEl("button", { cls: "hermine-edit-btn" });
+    const editBtn = wrapper.createEl("button", { cls: "hermione-edit-btn" });
     (0, import_obsidian4.setIcon)(editBtn, "pencil");
     editBtn.title = "Bearbeiten";
-    const saveBtn = wrapper.createEl("button", { cls: "hermine-save-btn" });
+    const saveBtn = wrapper.createEl("button", { cls: "hermione-save-btn" });
     (0, import_obsidian4.setIcon)(saveBtn, "check");
     saveBtn.title = "Speichern";
     saveBtn.style.display = "none";
-    const cancelBtn = wrapper.createEl("button", { cls: "hermine-cancel-btn" });
+    const cancelBtn = wrapper.createEl("button", { cls: "hermione-cancel-btn" });
     (0, import_obsidian4.setIcon)(cancelBtn, "x");
     cancelBtn.title = "Abbrechen";
     cancelBtn.style.display = "none";
@@ -1712,8 +1799,8 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
           this.refreshOnCacheUpdate(doc.file);
         } catch (error) {
           console.error("Failed to update property:", error);
-          container.addClass("hermine-error-flash");
-          setTimeout(() => container.removeClass("hermine-error-flash"), 500);
+          container.addClass("hermione-error-flash");
+          setTimeout(() => container.removeClass("hermione-error-flash"), 500);
         }
       }
       exitEditMode();
@@ -1744,25 +1831,25 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
    * Render toolbar with zoom controls and refresh button
    */
   renderRefreshButton() {
-    const toolbar = this.containerEl.createDiv({ cls: "hermine-toolbar" });
+    const toolbar = this.containerEl.createDiv({ cls: "hermione-toolbar" });
     if (this.boardEl) {
-      const zoomControls = toolbar.createDiv({ cls: "hermine-zoom-controls" });
-      const zoomOutBtn = zoomControls.createEl("button", { cls: "hermine-zoom-btn" });
+      const zoomControls = toolbar.createDiv({ cls: "hermione-zoom-controls" });
+      const zoomOutBtn = zoomControls.createEl("button", { cls: "hermione-zoom-btn" });
       (0, import_obsidian4.setIcon)(zoomOutBtn, "minus");
       zoomOutBtn.title = "Verkleinern";
       zoomOutBtn.addEventListener("click", () => this.zoomOut());
       this.zoomDisplay = zoomControls.createEl("button", {
-        cls: "hermine-zoom-display",
+        cls: "hermione-zoom-display",
         text: `${this.zoomLevel}%`
       });
       this.zoomDisplay.title = "Zoom zur\xFCcksetzen";
       this.zoomDisplay.addEventListener("click", () => this.resetZoom());
-      const zoomInBtn = zoomControls.createEl("button", { cls: "hermine-zoom-btn" });
+      const zoomInBtn = zoomControls.createEl("button", { cls: "hermione-zoom-btn" });
       (0, import_obsidian4.setIcon)(zoomInBtn, "plus");
       zoomInBtn.title = "Vergr\xF6\xDFern";
       zoomInBtn.addEventListener("click", () => this.zoomIn());
       const slider = zoomControls.createEl("input", {
-        cls: "hermine-zoom-slider",
+        cls: "hermione-zoom-slider",
         type: "range"
       });
       slider.min = String(_MatrixRenderer.ZOOM_MIN);
@@ -1776,7 +1863,7 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
       });
     }
     const refreshBtn = toolbar.createEl("button", {
-      cls: "hermine-refresh-btn",
+      cls: "hermione-refresh-btn",
       text: "Aktualisieren"
     });
     (0, import_obsidian4.setIcon)(refreshBtn, "refresh-cw");
@@ -1819,7 +1906,7 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
     if (this.zoomDisplay) {
       this.zoomDisplay.textContent = `${this.zoomLevel}%`;
     }
-    const slider = this.containerEl.querySelector(".hermine-zoom-slider");
+    const slider = this.containerEl.querySelector(".hermione-zoom-slider");
     if (slider) {
       slider.value = String(this.zoomLevel);
     }
@@ -1865,16 +1952,16 @@ var DEFAULT_SETTINGS = {
   refreshOnChange: true,
   defaultSort: "asc"
 };
-var HerminePlugin = class extends import_obsidian5.Plugin {
+var HermionePlugin = class extends import_obsidian5.Plugin {
   async onload() {
     await this.loadSettings();
     this.queryEngine = new QueryEngine(this.app);
-    this.registerMarkdownCodeBlockProcessor("hermine", this.processHermineBlock.bind(this));
-    this.addSettingTab(new HermineSettingTab(this.app, this));
-    console.log("Hermine plugin loaded");
+    this.registerMarkdownCodeBlockProcessor("hermione", this.processHermioneBlock.bind(this));
+    this.addSettingTab(new HermioneSettingTab(this.app, this));
+    console.log("Hermione plugin loaded");
   }
   onunload() {
-    console.log("Hermine plugin unloaded");
+    console.log("Hermione plugin unloaded");
   }
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
@@ -1883,11 +1970,11 @@ var HerminePlugin = class extends import_obsidian5.Plugin {
     await this.saveData(this.settings);
   }
   /**
-   * Process a hermine code block
+   * Process a hermione code block
    */
-  async processHermineBlock(source, el, ctx) {
+  async processHermioneBlock(source, el, ctx) {
     try {
-      const config = parseHermineBlock(source);
+      const config = parseHermioneBlock(source);
       if (!config.sort && (config.xAxis || config.yAxis)) {
         config.sort = {
           by: config.xAxis || config.yAxis,
@@ -1905,13 +1992,13 @@ var HerminePlugin = class extends import_obsidian5.Plugin {
       ctx.addChild(renderer);
     } catch (error) {
       el.createDiv({
-        cls: "hermine-error",
-        text: `Hermine Error: ${error.message}`
+        cls: "hermione-error",
+        text: `Hermione Error: ${error.message}`
       });
     }
   }
 };
-var HermineSettingTab = class extends import_obsidian5.PluginSettingTab {
+var HermioneSettingTab = class extends import_obsidian5.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -1919,7 +2006,7 @@ var HermineSettingTab = class extends import_obsidian5.PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: "Hermine Einstellungen" });
+    containerEl.createEl("h2", { text: "Hermione Einstellungen" });
     new import_obsidian5.Setting(containerEl).setName("Automatisch aktualisieren").setDesc("Aktualisiert die Ansicht automatisch, wenn Dokumente ge\xE4ndert werden").addToggle((toggle) => toggle.setValue(this.plugin.settings.refreshOnChange).onChange(async (value) => {
       this.plugin.settings.refreshOnChange = value;
       await this.plugin.saveSettings();
@@ -1929,10 +2016,10 @@ var HermineSettingTab = class extends import_obsidian5.PluginSettingTab {
       await this.plugin.saveSettings();
     }));
     containerEl.createEl("h3", { text: "Verwendung" });
-    const usageEl = containerEl.createDiv({ cls: "hermine-settings-usage" });
+    const usageEl = containerEl.createDiv({ cls: "hermione-settings-usage" });
     usageEl.innerHTML = `
-      <p>Erstellen Sie einen Code-Block mit dem Typ <code>hermine</code>:</p>
-      <pre><code>\`\`\`hermine
+      <p>Erstellen Sie einen Code-Block mit dem Typ <code>hermione</code>:</p>
+      <pre><code>\`\`\`hermione
 source: "Projekte"
 x-achse: Status
 y-achse: Priorit\xE4t

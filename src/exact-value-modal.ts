@@ -20,22 +20,22 @@ export class ExactValueModal extends Modal {
 
   onOpen(): void {
     const { contentEl } = this;
-    contentEl.addClass("hermine-exact-modal");
+    contentEl.addClass("hermione-exact-modal");
 
     contentEl.createEl("h3", {
       text: `Exakter Wert für "${this.axisName}"`
     });
 
     contentEl.createEl("p", {
-      cls: "hermine-exact-info",
+      cls: "hermione-exact-info",
       text: `Bereich: ${this.rangeMin} – ${this.rangeMax}`
     });
 
     // Input with range slider
-    const inputRow = contentEl.createDiv({ cls: "hermine-exact-input-row" });
+    const inputRow = contentEl.createDiv({ cls: "hermione-exact-input-row" });
 
     const input = inputRow.createEl("input", {
-      cls: "hermine-exact-input",
+      cls: "hermione-exact-input",
       type: "number",
     });
     input.min = String(this.rangeMin);
@@ -44,7 +44,7 @@ export class ExactValueModal extends Modal {
     input.step = "1";
 
     const slider = inputRow.createEl("input", {
-      cls: "hermine-exact-slider",
+      cls: "hermione-exact-slider",
       type: "range",
     });
     slider.min = String(this.rangeMin);
@@ -63,35 +63,35 @@ export class ExactValueModal extends Modal {
     });
 
     // Validation
-    const validation = contentEl.createDiv({ cls: "hermine-exact-validation" });
+    const validation = contentEl.createDiv({ cls: "hermione-exact-validation" });
 
     const updateValidation = () => {
       const num = parseFloat(input.value);
       if (isNaN(num)) {
         validation.textContent = "Bitte eine Zahl eingeben";
-        validation.className = "hermine-exact-validation hermine-picker-invalid";
+        validation.className = "hermione-exact-validation hermione-picker-invalid";
         confirmBtn.disabled = true;
       } else if (num < this.rangeMin || num > this.rangeMax) {
         validation.textContent = `Wert muss zwischen ${this.rangeMin} und ${this.rangeMax} liegen`;
-        validation.className = "hermine-exact-validation hermine-picker-invalid";
+        validation.className = "hermione-exact-validation hermione-picker-invalid";
         confirmBtn.disabled = true;
       } else {
         validation.textContent = `Wert: ${num}`;
-        validation.className = "hermine-exact-validation hermine-picker-valid";
+        validation.className = "hermione-exact-validation hermione-picker-valid";
         confirmBtn.disabled = false;
       }
     };
 
     // Buttons
-    const buttonContainer = contentEl.createDiv({ cls: "hermine-picker-buttons" });
+    const buttonContainer = contentEl.createDiv({ cls: "hermione-picker-buttons" });
 
     const confirmBtn = buttonContainer.createEl("button", {
-      cls: "hermine-picker-confirm mod-cta",
+      cls: "hermione-picker-confirm mod-cta",
       text: "Übernehmen"
     });
 
     const cancelBtn = buttonContainer.createEl("button", {
-      cls: "hermine-picker-cancel",
+      cls: "hermione-picker-cancel",
       text: "Abbrechen"
     });
 

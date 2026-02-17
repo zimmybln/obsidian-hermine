@@ -1,21 +1,21 @@
 import { App, Plugin, MarkdownPostProcessorContext, PluginSettingTab, Setting } from "obsidian";
-import { parseHermineBlock } from "./parser";
+import { parseHermioneBlock } from "./parser";
 import { QueryEngine } from "./query-engine";
 import { MatrixRenderer } from "./matrix-renderer";
-import { HermineConfig } from "./types";
+import { HermioneConfig } from "./types";
 
-interface HermineSettings {
+interface HermioneSettings {
   refreshOnChange: boolean;
   defaultSort: "asc" | "desc";
 }
 
-const DEFAULT_SETTINGS: HermineSettings = {
+const DEFAULT_SETTINGS: HermioneSettings = {
   refreshOnChange: true,
   defaultSort: "asc"
 };
 
-export default class HerminePlugin extends Plugin {
-  settings: HermineSettings;
+export default class HermionePlugin extends Plugin {
+  settings: HermioneSettings;
   private queryEngine: QueryEngine;
 
   async onload(): Promise<void> {
@@ -23,17 +23,17 @@ export default class HerminePlugin extends Plugin {
 
     this.queryEngine = new QueryEngine(this.app);
 
-    // Register the code block processor for "hermine" blocks
-    this.registerMarkdownCodeBlockProcessor("hermine", this.processHermineBlock.bind(this));
+    // Register the code block processor for "hermione" blocks
+    this.registerMarkdownCodeBlockProcessor("hermione", this.processHermioneBlock.bind(this));
 
     // Add settings tab
-    this.addSettingTab(new HermineSettingTab(this.app, this));
+    this.addSettingTab(new HermioneSettingTab(this.app, this));
 
-    console.log("Hermine plugin loaded");
+    console.log("Hermione plugin loaded");
   }
 
   onunload(): void {
-    console.log("Hermine plugin unloaded");
+    console.log("Hermione plugin unloaded");
   }
 
   async loadSettings(): Promise<void> {
@@ -45,16 +45,16 @@ export default class HerminePlugin extends Plugin {
   }
 
   /**
-   * Process a hermine code block
+   * Process a hermione code block
    */
-  private async processHermineBlock(
+  private async processHermioneBlock(
     source: string,
     el: HTMLElement,
     ctx: MarkdownPostProcessorContext
   ): Promise<void> {
     try {
       // Parse the configuration from the code block
-      const config = parseHermineBlock(source);
+      const config = parseHermioneBlock(source);
 
       // Apply default sort if not specified
       if (!config.sort && (config.xAxis || config.yAxis)) {
@@ -82,20 +82,20 @@ export default class HerminePlugin extends Plugin {
     } catch (error) {
       // Show error message
       el.createDiv({
-        cls: "hermine-error",
-        text: `Hermine Error: ${error.message}`
+        cls: "hermione-error",
+        text: `Hermione Error: ${error.message}`
       });
     }
   }
 }
 
 /**
- * Settings tab for the Hermine plugin
+ * Settings tab for the Hermione plugin
  */
-class HermineSettingTab extends PluginSettingTab {
-  plugin: HerminePlugin;
+class HermioneSettingTab extends PluginSettingTab {
+  plugin: HermionePlugin;
 
-  constructor(app: App, plugin: HerminePlugin) {
+  constructor(app: App, plugin: HermionePlugin) {
     super(app, plugin);
     this.plugin = plugin;
   }
@@ -104,7 +104,7 @@ class HermineSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: "Hermine Einstellungen" });
+    containerEl.createEl("h2", { text: "Hermione Einstellungen" });
 
     new Setting(containerEl)
       .setName("Automatisch aktualisieren")
@@ -131,10 +131,10 @@ class HermineSettingTab extends PluginSettingTab {
     // Usage instructions
     containerEl.createEl("h3", { text: "Verwendung" });
 
-    const usageEl = containerEl.createDiv({ cls: "hermine-settings-usage" });
+    const usageEl = containerEl.createDiv({ cls: "hermione-settings-usage" });
     usageEl.innerHTML = `
-      <p>Erstellen Sie einen Code-Block mit dem Typ <code>hermine</code>:</p>
-      <pre><code>\`\`\`hermine
+      <p>Erstellen Sie einen Code-Block mit dem Typ <code>hermione</code>:</p>
+      <pre><code>\`\`\`hermione
 source: "Projekte"
 x-achse: Status
 y-achse: Priorität

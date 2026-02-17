@@ -1,5 +1,5 @@
 import { App, TFile, MarkdownRenderChild, setIcon, MarkdownRenderer, Component } from "obsidian";
-import { HermineConfig, DocumentData, QueryResult } from "./types";
+import { HermioneConfig, DocumentData, QueryResult } from "./types";
 import { FrontmatterUpdater } from "./frontmatter-updater";
 import { compileTransform, applyTransform, buildReverseMap } from "./value-transform";
 import { ValuePickerModal } from "./value-picker-modal";
@@ -34,7 +34,7 @@ export class MatrixRenderer extends MarkdownRenderChild {
   constructor(
     containerEl: HTMLElement,
     private app: App,
-    private config: HermineConfig,
+    private config: HermioneConfig,
     private result: QueryResult,
     private onRefresh: () => void
   ) {
@@ -74,17 +74,22 @@ export class MatrixRenderer extends MarkdownRenderChild {
    */
   render(): void {
     this.containerEl.empty();
-    this.containerEl.addClass("hermine-container");
+    this.containerEl.addClass("hermione-container");
 
     // Apply theme class if configured
     if (this.config.theme) {
-      this.containerEl.addClass(`hermine-theme-${this.config.theme}`);
+      this.containerEl.addClass(`hermione-theme-${this.config.theme}`);
+    }
+
+    // Apply row height mode
+    if (this.config.rowHeight === "flexible") {
+      this.containerEl.addClass("hermione-rows-flexible");
     }
 
     // Render title if configured
     if (this.config.title) {
       this.containerEl.createEl("h3", {
-        cls: "hermine-title",
+        cls: "hermione-title",
         text: this.config.title
       });
     }
@@ -113,9 +118,9 @@ export class MatrixRenderer extends MarkdownRenderChild {
    * Render error messages
    */
   private renderErrors(): void {
-    const errorContainer = this.containerEl.createDiv({ cls: "hermine-errors" });
+    const errorContainer = this.containerEl.createDiv({ cls: "hermione-errors" });
     for (const error of this.result.errors) {
-      errorContainer.createDiv({ cls: "hermine-error", text: error });
+      errorContainer.createDiv({ cls: "hermione-error", text: error });
     }
   }
 
@@ -124,7 +129,7 @@ export class MatrixRenderer extends MarkdownRenderChild {
    */
   private renderEmptyState(): void {
     this.containerEl.createDiv({
-      cls: "hermine-empty",
+      cls: "hermione-empty",
       text: "Keine Dokumente gefunden."
     });
   }
@@ -133,7 +138,7 @@ export class MatrixRenderer extends MarkdownRenderChild {
    * Render a simple table (X-axis only)
    */
   private renderTable(): void {
-    const table = this.containerEl.createEl("table", { cls: "hermine-table" });
+    const table = this.containerEl.createEl("table", { cls: "hermione-table" });
 
     // Header row
     const thead = table.createEl("thead");
@@ -159,7 +164,7 @@ export class MatrixRenderer extends MarkdownRenderChild {
       const row = tbody.createEl("tr");
 
       // Document name (clickable link)
-      const nameCell = row.createEl("td", { cls: "hermine-cell-name" });
+      const nameCell = row.createEl("td", { cls: "hermione-cell-name" });
       const link = nameCell.createEl("a", {
         cls: "internal-link",
         text: doc.name
@@ -171,14 +176,14 @@ export class MatrixRenderer extends MarkdownRenderChild {
 
       // X-axis value (editable)
       const xValue = this.getPropertyValue(doc.properties, this.config.xAxis!);
-      const xCell = row.createEl("td", { cls: "hermine-cell-editable" });
+      const xCell = row.createEl("td", { cls: "hermione-cell-editable" });
       this.renderEditableCell(xCell, doc, this.config.xAxis!, xValue);
 
       // Additional display columns (editable)
       if (this.config.display) {
         for (const prop of this.config.display) {
           const value = this.getPropertyValue(doc.properties, prop);
-          const cell = row.createEl("td", { cls: "hermine-cell-editable" });
+          const cell = row.createEl("td", { cls: "hermione-cell-editable" });
           this.renderEditableCell(cell, doc, prop, value);
         }
       }
@@ -202,16 +207,16 @@ export class MatrixRenderer extends MarkdownRenderChild {
       : Array.from(this.result.yAxisValues).sort();
 
     // Create layout wrapper for optional Y-axis label
-    const boardLayout = this.containerEl.createDiv({ cls: "hermine-board-layout" });
+    const boardLayout = this.containerEl.createDiv({ cls: "hermione-board-layout" });
 
     // Y-axis label (rotated, left side)
     if (this.config.yLabel) {
-      const yLabelEl = boardLayout.createDiv({ cls: "hermine-axis-label-y" });
+      const yLabelEl = boardLayout.createDiv({ cls: "hermione-axis-label-y" });
       yLabelEl.createSpan({ text: this.config.yLabel });
     }
 
     // Create zoom wrapper for scrollable/zoomable content
-    const zoomWrapper = boardLayout.createDiv({ cls: "hermine-zoom-wrapper" });
+    const zoomWrapper = boardLayout.createDiv({ cls: "hermione-zoom-wrapper" });
 
     // Mouse wheel zoom on the board area
     zoomWrapper.addEventListener("wheel", (e) => {
@@ -226,7 +231,7 @@ export class MatrixRenderer extends MarkdownRenderChild {
     }, { passive: false });
 
     // Create board container
-    const board = zoomWrapper.createDiv({ cls: "hermine-board" });
+    const board = zoomWrapper.createDiv({ cls: "hermione-board" });
     this.boardEl = board;
 
     // Set grid template columns based on number of X values (+ 1 for Y labels)
@@ -236,23 +241,23 @@ export class MatrixRenderer extends MarkdownRenderChild {
     this.applyZoom();
 
     // Create corner cell (empty)
-    const corner = board.createDiv({ cls: "hermine-board-corner" });
+    const corner = board.createDiv({ cls: "hermione-board-corner" });
 
     // Create X-axis header labels
     for (const xVal of xValues) {
-      const xHeader = board.createDiv({ cls: "hermine-board-header-x" });
+      const xHeader = board.createDiv({ cls: "hermione-board-header-x" });
       xHeader.createSpan({ text: String(xVal) });
     }
 
     // Create rows with Y-axis labels and cells
     for (const yVal of yValues) {
       // Y-axis label
-      const yHeader = board.createDiv({ cls: "hermine-board-header-y" });
+      const yHeader = board.createDiv({ cls: "hermione-board-header-y" });
       yHeader.createSpan({ text: String(yVal) });
 
       // Create cells for each X value
       for (const xVal of xValues) {
-        const cell = board.createDiv({ cls: "hermine-board-cell" });
+        const cell = board.createDiv({ cls: "hermione-board-cell" });
 
         // Set data attributes for drop target identification
         cell.dataset.xValue = String(xVal);
@@ -277,7 +282,7 @@ export class MatrixRenderer extends MarkdownRenderChild {
         });
 
         if (matchingDocs.length > 0) {
-          const dotsContainer = cell.createDiv({ cls: "hermine-board-items" });
+          const dotsContainer = cell.createDiv({ cls: "hermione-board-items" });
 
           for (const doc of matchingDocs) {
             this.renderDocumentCard(dotsContainer, doc);
@@ -289,7 +294,7 @@ export class MatrixRenderer extends MarkdownRenderChild {
     // X-axis label (centered below data columns, inside the grid)
     if (this.config.xLabel) {
       board.createDiv(); // empty placeholder for y-header column
-      const xLabelEl = board.createDiv({ cls: "hermine-axis-label-x" });
+      const xLabelEl = board.createDiv({ cls: "hermione-axis-label-x" });
       xLabelEl.style.gridColumn = `span ${xValues.length}`;
       xLabelEl.createSpan({ text: this.config.xLabel });
     }
@@ -319,10 +324,10 @@ export class MatrixRenderer extends MarkdownRenderChild {
       : (this.config.xLabel || this.config.yLabel);
 
     // Create layout wrapper
-    const boardLayout = this.containerEl.createDiv({ cls: "hermine-board-layout" });
+    const boardLayout = this.containerEl.createDiv({ cls: "hermione-board-layout" });
 
     // Create zoom wrapper
-    const zoomWrapper = boardLayout.createDiv({ cls: "hermine-zoom-wrapper" });
+    const zoomWrapper = boardLayout.createDiv({ cls: "hermione-zoom-wrapper" });
 
     zoomWrapper.addEventListener("wheel", (e) => {
       if (e.ctrlKey) {
@@ -333,7 +338,7 @@ export class MatrixRenderer extends MarkdownRenderChild {
     }, { passive: false });
 
     // Create board container
-    const board = zoomWrapper.createDiv({ cls: "hermine-board hermine-board-single-axis" });
+    const board = zoomWrapper.createDiv({ cls: "hermione-board hermione-board-single-axis" });
     this.boardEl = board;
 
     if (isYOnly) {
@@ -344,11 +349,11 @@ export class MatrixRenderer extends MarkdownRenderChild {
 
       for (const val of axisValues) {
         // Y-header on the left
-        const header = board.createDiv({ cls: "hermine-board-header-y" });
+        const header = board.createDiv({ cls: "hermione-board-header-y" });
         header.createSpan({ text: String(val) });
 
         // Cell on the right
-        const cell = board.createDiv({ cls: "hermine-board-cell hermine-board-cell-horizontal" });
+        const cell = board.createDiv({ cls: "hermione-board-cell hermione-board-cell-horizontal" });
         cell.dataset.yValue = String(val);
 
         this.setupDropZone(cell, undefined, val, [], axisValues);
@@ -361,7 +366,7 @@ export class MatrixRenderer extends MarkdownRenderChild {
         });
 
         if (matchingDocs.length > 0) {
-          const items = cell.createDiv({ cls: "hermine-board-items hermine-board-items-horizontal" });
+          const items = cell.createDiv({ cls: "hermione-board-items hermione-board-items-horizontal" });
           for (const doc of matchingDocs) {
             this.renderDocumentCard(items, doc);
           }
@@ -370,7 +375,7 @@ export class MatrixRenderer extends MarkdownRenderChild {
 
       // Axis label below
       if (axisLabel) {
-        const labelEl = board.createDiv({ cls: "hermine-axis-label-y-bottom" });
+        const labelEl = board.createDiv({ cls: "hermione-axis-label-y-bottom" });
         labelEl.style.gridColumn = "span 2";
         labelEl.createSpan({ text: axisLabel });
       }
@@ -382,13 +387,13 @@ export class MatrixRenderer extends MarkdownRenderChild {
 
       // Header row
       for (const val of axisValues) {
-        const header = board.createDiv({ cls: "hermine-board-header-x" });
+        const header = board.createDiv({ cls: "hermione-board-header-x" });
         header.createSpan({ text: String(val) });
       }
 
       // Single row of cells
       for (const val of axisValues) {
-        const cell = board.createDiv({ cls: "hermine-board-cell" });
+        const cell = board.createDiv({ cls: "hermione-board-cell" });
         cell.dataset.xValue = String(val);
 
         this.setupDropZone(cell, val, undefined, axisValues, []);
@@ -401,7 +406,7 @@ export class MatrixRenderer extends MarkdownRenderChild {
         });
 
         if (matchingDocs.length > 0) {
-          const items = cell.createDiv({ cls: "hermine-board-items" });
+          const items = cell.createDiv({ cls: "hermione-board-items" });
           for (const doc of matchingDocs) {
             this.renderDocumentCard(items, doc);
           }
@@ -410,7 +415,7 @@ export class MatrixRenderer extends MarkdownRenderChild {
 
       // Axis label below
       if (axisLabel) {
-        const labelEl = board.createDiv({ cls: "hermine-axis-label-x" });
+        const labelEl = board.createDiv({ cls: "hermione-axis-label-x" });
         labelEl.style.gridColumn = `span ${axisValues.length}`;
         labelEl.createSpan({ text: axisLabel });
       }
@@ -431,13 +436,13 @@ export class MatrixRenderer extends MarkdownRenderChild {
    * Render a document as a draggable card for the board view
    */
   private renderDocumentCard(container: HTMLElement, doc: DocumentData): void {
-    const card = container.createDiv({ cls: "hermine-card" });
+    const card = container.createDiv({ cls: "hermione-card" });
 
     // Evaluate custom card style
     const cardStyle = this.evaluateCardStyle(doc);
 
     // Color indicator bar
-    const colorBar = card.createDiv({ cls: "hermine-card-color" });
+    const colorBar = card.createDiv({ cls: "hermione-card-color" });
     colorBar.style.backgroundColor = cardStyle.color || this.getDocumentColor(doc.name);
 
     // Apply additional card styles
@@ -449,8 +454,8 @@ export class MatrixRenderer extends MarkdownRenderChild {
     }
 
     // Card content
-    const content = card.createDiv({ cls: "hermine-card-content" });
-    const titleSpan = content.createSpan({ cls: "hermine-card-title", text: doc.name });
+    const content = card.createDiv({ cls: "hermione-card-content" });
+    const titleSpan = content.createSpan({ cls: "hermione-card-title", text: doc.name });
     if (cardStyle.textColor) {
       titleSpan.style.color = cardStyle.textColor;
     }
@@ -473,7 +478,7 @@ export class MatrixRenderer extends MarkdownRenderChild {
     card.addEventListener("dragstart", (e) => {
       if (fullyReadonly) { e.preventDefault(); return; }
       this.currentDragDoc = doc;
-      card.addClass("hermine-card-dragging");
+      card.addClass("hermione-card-dragging");
       e.dataTransfer?.setData("text/plain", doc.path);
 
       // Determine the current cell position of this document
@@ -491,7 +496,7 @@ export class MatrixRenderer extends MarkdownRenderChild {
         : undefined;
 
       // Highlight only reachable drop zones
-      this.containerEl.querySelectorAll(".hermine-board-cell").forEach((cell: Element) => {
+      this.containerEl.querySelectorAll(".hermione-board-cell").forEach((cell: Element) => {
         const el = cell as HTMLElement;
         const cellX = el.dataset.xValue;
         const cellY = el.dataset.yValue;
@@ -500,7 +505,7 @@ export class MatrixRenderer extends MarkdownRenderChild {
         const yAllowed = !this.config.yReadonly || cellY === docYStr;
 
         if (xAllowed && yAllowed) {
-          el.addClass("hermine-drop-zone-active");
+          el.addClass("hermione-drop-zone-active");
         }
       });
     });
@@ -508,12 +513,12 @@ export class MatrixRenderer extends MarkdownRenderChild {
     // Drag end
     card.addEventListener("dragend", () => {
       this.currentDragDoc = null;
-      card.removeClass("hermine-card-dragging");
+      card.removeClass("hermione-card-dragging");
 
       // Remove highlight from drop zones
-      this.containerEl.querySelectorAll(".hermine-board-cell").forEach(cell => {
-        cell.removeClass("hermine-drop-zone-active");
-        cell.removeClass("hermine-drop-zone-hover");
+      this.containerEl.querySelectorAll(".hermione-board-cell").forEach(cell => {
+        cell.removeClass("hermione-drop-zone-active");
+        cell.removeClass("hermione-drop-zone-hover");
       });
     });
 
@@ -545,15 +550,15 @@ export class MatrixRenderer extends MarkdownRenderChild {
    */
   private renderDocumentDot(container: HTMLElement, doc: DocumentData): void {
     // Create wrapper for dot and title
-    const wrapper = container.createDiv({ cls: "hermine-dot-wrapper" });
+    const wrapper = container.createDiv({ cls: "hermione-dot-wrapper" });
 
     // Create the colored dot
-    const dot = wrapper.createDiv({ cls: "hermine-dot" });
+    const dot = wrapper.createDiv({ cls: "hermione-dot" });
     const color = this.getDocumentColor(doc.name);
     dot.style.backgroundColor = color;
 
     // Create the title label
-    const title = wrapper.createSpan({ cls: "hermine-dot-title", text: doc.name });
+    const title = wrapper.createSpan({ cls: "hermione-dot-title", text: doc.name });
 
     // Store document reference
     wrapper.dataset.docPath = doc.path;
@@ -564,24 +569,24 @@ export class MatrixRenderer extends MarkdownRenderChild {
     // Drag start
     wrapper.addEventListener("dragstart", (e) => {
       this.currentDragDoc = doc;
-      wrapper.addClass("hermine-dot-dragging");
+      wrapper.addClass("hermione-dot-dragging");
       e.dataTransfer?.setData("text/plain", doc.path);
 
       // Highlight all drop zones
-      this.containerEl.querySelectorAll(".hermine-matrix-cell").forEach(cell => {
-        cell.addClass("hermine-drop-zone-active");
+      this.containerEl.querySelectorAll(".hermione-matrix-cell").forEach(cell => {
+        cell.addClass("hermione-drop-zone-active");
       });
     });
 
     // Drag end
     wrapper.addEventListener("dragend", () => {
       this.currentDragDoc = null;
-      wrapper.removeClass("hermine-dot-dragging");
+      wrapper.removeClass("hermione-dot-dragging");
 
       // Remove highlight from drop zones
-      this.containerEl.querySelectorAll(".hermine-matrix-cell").forEach(cell => {
-        cell.removeClass("hermine-drop-zone-active");
-        cell.removeClass("hermine-drop-zone-hover");
+      this.containerEl.querySelectorAll(".hermione-matrix-cell").forEach(cell => {
+        cell.removeClass("hermione-drop-zone-active");
+        cell.removeClass("hermione-drop-zone-hover");
       });
     });
 
@@ -617,19 +622,19 @@ export class MatrixRenderer extends MarkdownRenderChild {
   ): void {
     cell.addEventListener("dragover", (e) => {
       // Only allow drop on reachable cells
-      if (!cell.hasClass("hermine-drop-zone-active")) return;
+      if (!cell.hasClass("hermione-drop-zone-active")) return;
       e.preventDefault();
-      cell.addClass("hermine-drop-zone-hover");
+      cell.addClass("hermione-drop-zone-hover");
     });
 
     cell.addEventListener("dragleave", () => {
-      cell.removeClass("hermine-drop-zone-hover");
+      cell.removeClass("hermione-drop-zone-hover");
     });
 
     cell.addEventListener("drop", async (e) => {
-      if (!cell.hasClass("hermine-drop-zone-active")) return;
+      if (!cell.hasClass("hermione-drop-zone-active")) return;
       e.preventDefault();
-      cell.removeClass("hermine-drop-zone-hover");
+      cell.removeClass("hermione-drop-zone-hover");
 
       if (!this.currentDragDoc) return;
       const doc = this.currentDragDoc;
@@ -754,27 +759,43 @@ export class MatrixRenderer extends MarkdownRenderChild {
     this.hidePreview();
 
     // Create preview container
-    this.previewEl = document.body.createDiv({ cls: "hermine-preview" });
+    this.previewEl = document.body.createDiv({ cls: "hermione-preview" });
 
     // Header with document name
-    const header = this.previewEl.createDiv({ cls: "hermine-preview-header" });
-    header.createSpan({ text: doc.name, cls: "hermine-preview-title" });
+    const header = this.previewEl.createDiv({ cls: "hermione-preview-header" });
+    header.createSpan({ text: doc.name, cls: "hermione-preview-title" });
 
     // Content container
-    const content = this.previewEl.createDiv({ cls: "hermine-preview-content" });
+    const content = this.previewEl.createDiv({ cls: "hermione-preview-content" });
 
+    const mode = this.config.preview || "document";
+
+    switch (mode) {
+      case "axes":
+        this.showPreviewAxes(content, doc);
+        break;
+      case "properties":
+        this.showPreviewProperties(content, doc);
+        break;
+      default:
+        await this.showPreviewDocument(content, doc);
+        break;
+    }
+
+    // Position the preview
+    this.positionPreview(event);
+  }
+
+  /**
+   * Show document content as rendered markdown preview
+   */
+  private async showPreviewDocument(content: HTMLElement, doc: DocumentData): Promise<void> {
     try {
-      // Read the file content
       const fileContent = await this.app.vault.read(doc.file);
-
-      // Remove frontmatter for display
       const contentWithoutFrontmatter = fileContent.replace(/^---[\s\S]*?---\n?/, "");
-
-      // Limit content length for preview
       const previewContent = contentWithoutFrontmatter.slice(0, 1000);
       const truncated = contentWithoutFrontmatter.length > 1000;
 
-      // Render markdown
       await MarkdownRenderer.render(
         this.app,
         previewContent + (truncated ? "\n\n*...*" : ""),
@@ -783,11 +804,50 @@ export class MatrixRenderer extends MarkdownRenderChild {
         new Component()
       );
     } catch (error) {
-      content.createSpan({ text: "Vorschau nicht verfügbar", cls: "hermine-preview-error" });
+      content.createSpan({ text: "Vorschau nicht verfügbar", cls: "hermione-preview-error" });
+    }
+  }
+
+  /**
+   * Show axis property values in the preview
+   */
+  private showPreviewAxes(content: HTMLElement, doc: DocumentData): void {
+    const list = content.createDiv({ cls: "hermione-preview-props" });
+
+    if (this.config.xAxis) {
+      const label = this.config.xLabel || this.config.xAxis;
+      const value = this.getPropertyValue(doc.properties, this.config.xAxis);
+      this.renderPreviewProp(list, label, value);
     }
 
-    // Position the preview
-    this.positionPreview(event);
+    if (this.config.yAxis) {
+      const label = this.config.yLabel || this.config.yAxis;
+      const value = this.getPropertyValue(doc.properties, this.config.yAxis);
+      this.renderPreviewProp(list, label, value);
+    }
+  }
+
+  /**
+   * Show all user-defined frontmatter properties in the preview
+   */
+  private showPreviewProperties(content: HTMLElement, doc: DocumentData): void {
+    const list = content.createDiv({ cls: "hermione-preview-props" });
+    const skipKeys = new Set(["position", "file.name", "file.path", "file.ctime", "file.mtime", "file.size", "file.tags"]);
+
+    for (const [key, value] of Object.entries(doc.properties)) {
+      if (skipKeys.has(key) || key.startsWith("file.")) continue;
+      if (typeof value === "object" && value !== null && !Array.isArray(value) && "start" in value && "end" in value) continue;
+      this.renderPreviewProp(list, key, value);
+    }
+  }
+
+  /**
+   * Render a single key-value pair in the preview
+   */
+  private renderPreviewProp(container: HTMLElement, key: string, value: any): void {
+    const row = container.createDiv({ cls: "hermione-preview-prop" });
+    row.createSpan({ cls: "hermione-preview-prop-key", text: key });
+    row.createSpan({ cls: "hermione-preview-prop-value", text: this.formatDisplayValue(value) });
   }
 
   /**
@@ -969,7 +1029,7 @@ export class MatrixRenderer extends MarkdownRenderChild {
         };
       }
     } catch (e) {
-      console.error("Hermine: card-style evaluation error for", doc.name, e);
+      console.error("Hermione: card-style evaluation error for", doc.name, e);
     }
 
     return {};
@@ -1031,10 +1091,10 @@ export class MatrixRenderer extends MarkdownRenderChild {
 
     if (unassigned.length === 0) return;
 
-    const section = this.containerEl.createDiv({ cls: "hermine-unassigned" });
+    const section = this.containerEl.createDiv({ cls: "hermione-unassigned" });
     section.createEl("strong", { text: "Nicht zugeordnet:" });
 
-    const items = section.createDiv({ cls: "hermine-unassigned-items" });
+    const items = section.createDiv({ cls: "hermione-unassigned-items" });
 
     for (const doc of unassigned) {
       this.renderDocumentCard(items, doc);
@@ -1053,17 +1113,17 @@ export class MatrixRenderer extends MarkdownRenderChild {
   ): void {
     const displayValue = this.formatDisplayValue(value);
 
-    const wrapper = container.createDiv({ cls: "hermine-editable-wrapper" });
+    const wrapper = container.createDiv({ cls: "hermione-editable-wrapper" });
 
     // Display span
     const display = wrapper.createSpan({
-      cls: "hermine-value-display",
+      cls: "hermione-value-display",
       text: displayValue
     });
 
     // Edit input (hidden by default)
     const input = wrapper.createEl("input", {
-      cls: "hermine-value-input",
+      cls: "hermione-value-input",
       type: "text",
       value: displayValue
     });
@@ -1071,25 +1131,25 @@ export class MatrixRenderer extends MarkdownRenderChild {
 
     if (compact) {
       const label = wrapper.createSpan({
-        cls: "hermine-prop-label",
+        cls: "hermione-prop-label",
         text: `${propertyName}: `
       });
       wrapper.insertBefore(label, display);
     }
 
     // Edit button
-    const editBtn = wrapper.createEl("button", { cls: "hermine-edit-btn" });
+    const editBtn = wrapper.createEl("button", { cls: "hermione-edit-btn" });
     setIcon(editBtn, "pencil");
     editBtn.title = "Bearbeiten";
 
     // Save button (hidden by default)
-    const saveBtn = wrapper.createEl("button", { cls: "hermine-save-btn" });
+    const saveBtn = wrapper.createEl("button", { cls: "hermione-save-btn" });
     setIcon(saveBtn, "check");
     saveBtn.title = "Speichern";
     saveBtn.style.display = "none";
 
     // Cancel button (hidden by default)
-    const cancelBtn = wrapper.createEl("button", { cls: "hermine-cancel-btn" });
+    const cancelBtn = wrapper.createEl("button", { cls: "hermione-cancel-btn" });
     setIcon(cancelBtn, "x");
     cancelBtn.title = "Abbrechen";
     cancelBtn.style.display = "none";
@@ -1128,8 +1188,8 @@ export class MatrixRenderer extends MarkdownRenderChild {
         } catch (error) {
           console.error("Failed to update property:", error);
           // Show error feedback
-          container.addClass("hermine-error-flash");
-          setTimeout(() => container.removeClass("hermine-error-flash"), 500);
+          container.addClass("hermione-error-flash");
+          setTimeout(() => container.removeClass("hermione-error-flash"), 500);
         }
       }
 
@@ -1168,36 +1228,36 @@ export class MatrixRenderer extends MarkdownRenderChild {
    * Render toolbar with zoom controls and refresh button
    */
   private renderRefreshButton(): void {
-    const toolbar = this.containerEl.createDiv({ cls: "hermine-toolbar" });
+    const toolbar = this.containerEl.createDiv({ cls: "hermione-toolbar" });
 
     // Show zoom controls for board views (both matrix and single-axis)
     if (this.boardEl) {
       // Zoom controls container
-      const zoomControls = toolbar.createDiv({ cls: "hermine-zoom-controls" });
+      const zoomControls = toolbar.createDiv({ cls: "hermione-zoom-controls" });
 
       // Zoom out button
-      const zoomOutBtn = zoomControls.createEl("button", { cls: "hermine-zoom-btn" });
+      const zoomOutBtn = zoomControls.createEl("button", { cls: "hermione-zoom-btn" });
       setIcon(zoomOutBtn, "minus");
       zoomOutBtn.title = "Verkleinern";
       zoomOutBtn.addEventListener("click", () => this.zoomOut());
 
       // Zoom display/reset
       this.zoomDisplay = zoomControls.createEl("button", {
-        cls: "hermine-zoom-display",
+        cls: "hermione-zoom-display",
         text: `${this.zoomLevel}%`
       });
       this.zoomDisplay.title = "Zoom zurücksetzen";
       this.zoomDisplay.addEventListener("click", () => this.resetZoom());
 
       // Zoom in button
-      const zoomInBtn = zoomControls.createEl("button", { cls: "hermine-zoom-btn" });
+      const zoomInBtn = zoomControls.createEl("button", { cls: "hermione-zoom-btn" });
       setIcon(zoomInBtn, "plus");
       zoomInBtn.title = "Vergrößern";
       zoomInBtn.addEventListener("click", () => this.zoomIn());
 
       // Zoom slider
       const slider = zoomControls.createEl("input", {
-        cls: "hermine-zoom-slider",
+        cls: "hermione-zoom-slider",
         type: "range",
       });
       slider.min = String(MatrixRenderer.ZOOM_MIN);
@@ -1213,7 +1273,7 @@ export class MatrixRenderer extends MarkdownRenderChild {
 
     // Refresh button
     const refreshBtn = toolbar.createEl("button", {
-      cls: "hermine-refresh-btn",
+      cls: "hermione-refresh-btn",
       text: "Aktualisieren"
     });
     setIcon(refreshBtn, "refresh-cw");
@@ -1264,7 +1324,7 @@ export class MatrixRenderer extends MarkdownRenderChild {
     }
 
     // Update slider if it exists
-    const slider = this.containerEl.querySelector(".hermine-zoom-slider") as HTMLInputElement;
+    const slider = this.containerEl.querySelector(".hermione-zoom-slider") as HTMLInputElement;
     if (slider) {
       slider.value = String(this.zoomLevel);
     }

@@ -1,9 +1,9 @@
 import { TFile } from "obsidian";
 
 /**
- * Configuration for a Hermine query block
+ * Configuration for a Hermione query block
  */
-export interface HermineConfig {
+export interface HermioneConfig {
   /** Title displayed at the top of the view */
   title?: string;
   /** Source query - folder path, tag, or special query like "all" */
@@ -49,6 +49,10 @@ export interface HermineConfig {
   hideUnassigned?: boolean;
   /** JavaScript arrow function to filter documents: (docs) => docs.filter(...) */
   filter?: string;
+  /** Row height mode: "flexible" (auto-fit content) or "static" (fixed min-height, default) */
+  rowHeight?: "flexible" | "static";
+  /** Preview mode on card hover: "document" (default), "axes", or "properties" */
+  preview?: "document" | "axes" | "properties";
 }
 
 /**

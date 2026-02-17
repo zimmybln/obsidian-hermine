@@ -21,7 +21,7 @@ export class ValuePickerModal extends Modal {
 
   onOpen(): void {
     const { contentEl } = this;
-    contentEl.addClass("hermine-value-picker-modal");
+    contentEl.addClass("hermione-value-picker-modal");
 
     // Header
     contentEl.createEl("h3", {
@@ -30,34 +30,34 @@ export class ValuePickerModal extends Modal {
 
     // Group info
     contentEl.createEl("p", {
-      cls: "hermine-picker-info",
+      cls: "hermione-picker-info",
       text: `Zielgruppe: ${this.groupLabel}`
     });
 
     // Input field
-    const inputContainer = contentEl.createDiv({ cls: "hermine-picker-input-container" });
+    const inputContainer = contentEl.createDiv({ cls: "hermione-picker-input-container" });
     const input = inputContainer.createEl("input", {
-      cls: "hermine-picker-input",
+      cls: "hermione-picker-input",
       type: "text",
       placeholder: "Wert eingeben..."
     });
     input.focus();
 
     // Validation message
-    const validation = contentEl.createDiv({ cls: "hermine-picker-validation" });
+    const validation = contentEl.createDiv({ cls: "hermione-picker-validation" });
 
     // Suggestions from existing values
     if (this.existingValues.length > 0) {
-      const suggestionsContainer = contentEl.createDiv({ cls: "hermine-picker-suggestions" });
+      const suggestionsContainer = contentEl.createDiv({ cls: "hermione-picker-suggestions" });
       suggestionsContainer.createEl("span", {
-        cls: "hermine-picker-suggestions-label",
+        cls: "hermione-picker-suggestions-label",
         text: "Vorhandene Werte:"
       });
 
-      const suggestionsWrapper = suggestionsContainer.createDiv({ cls: "hermine-picker-suggestions-list" });
+      const suggestionsWrapper = suggestionsContainer.createDiv({ cls: "hermione-picker-suggestions-list" });
       for (const val of this.existingValues.sort()) {
         const chip = suggestionsWrapper.createEl("button", {
-          cls: "hermine-picker-chip",
+          cls: "hermione-picker-chip",
           text: String(val)
         });
         chip.addEventListener("click", () => {
@@ -68,16 +68,16 @@ export class ValuePickerModal extends Modal {
     }
 
     // Buttons
-    const buttonContainer = contentEl.createDiv({ cls: "hermine-picker-buttons" });
+    const buttonContainer = contentEl.createDiv({ cls: "hermione-picker-buttons" });
 
     const confirmBtn = buttonContainer.createEl("button", {
-      cls: "hermine-picker-confirm mod-cta",
+      cls: "hermione-picker-confirm mod-cta",
       text: "Übernehmen"
     });
     confirmBtn.disabled = true;
 
     const cancelBtn = buttonContainer.createEl("button", {
-      cls: "hermine-picker-cancel",
+      cls: "hermione-picker-cancel",
       text: "Abbrechen"
     });
 
@@ -86,7 +86,7 @@ export class ValuePickerModal extends Modal {
       const raw = input.value.trim();
       if (!raw) {
         validation.textContent = "";
-        validation.className = "hermine-picker-validation";
+        validation.className = "hermione-picker-validation";
         confirmBtn.disabled = true;
         return;
       }
@@ -97,11 +97,11 @@ export class ValuePickerModal extends Modal {
 
       if (transformed === this.groupLabel) {
         validation.textContent = `✓ Wert ${raw} → Gruppe "${transformed}"`;
-        validation.className = "hermine-picker-validation hermine-picker-valid";
+        validation.className = "hermione-picker-validation hermione-picker-valid";
         confirmBtn.disabled = false;
       } else {
         validation.textContent = `✗ Wert ${raw} gehört zu Gruppe "${transformed}", nicht "${this.groupLabel}"`;
-        validation.className = "hermine-picker-validation hermine-picker-invalid";
+        validation.className = "hermione-picker-validation hermione-picker-invalid";
         confirmBtn.disabled = true;
       }
     };

@@ -1,5 +1,5 @@
 {
-  "name": "obsidian-hermine",
+  "name": "obsidian-hermione",
   "version": "1.0.0",
   "description": "Obsidian plugin for querying and editing document properties in a matrix view",
   "main": "main.js",
