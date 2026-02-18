@@ -2,6 +2,7 @@ import { App, Plugin, MarkdownPostProcessorContext, PluginSettingTab, Setting } 
 import { parseHermioneBlock } from "./parser";
 import { QueryEngine } from "./query-engine";
 import { MatrixRenderer } from "./matrix-renderer";
+import { CanvasRenderer } from "./canvas-renderer";
 import { HermioneConfig } from "./types";
 
 interface HermioneSettings {
@@ -67,16 +68,19 @@ export default class HermionePlugin extends Plugin {
       // Execute the query
       const result = await this.queryEngine.execute(config);
 
+      // Choose renderer class based on config
+      const RendererClass = config.renderer === "canvas" ? CanvasRenderer : MatrixRenderer;
+
       // Create refresh callback
       const refresh = async () => {
         const newResult = await this.queryEngine.execute(config);
         el.empty();
-        const renderer = new MatrixRenderer(el, this.app, config, newResult, refresh);
+        const renderer = new RendererClass(el, this.app, config, newResult, refresh);
         ctx.addChild(renderer);
       };
 
-      // Render the matrix view
-      const renderer = new MatrixRenderer(el, this.app, config, result, refresh);
+      // Render the view
+      const renderer = new RendererClass(el, this.app, config, result, refresh);
       ctx.addChild(renderer);
 
     } catch (error) {

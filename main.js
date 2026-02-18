@@ -27,7 +27,7 @@ __export(main_exports, {
   default: () => HermionePlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian5 = require("obsidian");
+var import_obsidian6 = require("obsidian");
 
 // src/parser.ts
 var FUNCTION_KEYS = /* @__PURE__ */ new Set([
@@ -264,6 +264,11 @@ function parseHermioneBlock(content) {
       case "ybis":
       case "yend":
         config.yAxisEnd = value;
+        break;
+      case "renderer":
+      case "darstellung":
+      case "rendering":
+        config.renderer = value.toLowerCase() === "canvas" ? "canvas" : "html";
         break;
       case "preview":
       case "vorschau":
@@ -2434,12 +2439,1695 @@ MatrixRenderer.ZOOM_MIN = 50;
 MatrixRenderer.ZOOM_MAX = 150;
 MatrixRenderer.ZOOM_STEP = 10;
 
+// src/canvas-renderer.ts
+var import_obsidian5 = require("obsidian");
+
+// src/renderer-utils.ts
+function getPropertyValue(obj, path) {
+  const parts = path.split(".");
+  let value = obj;
+  for (const part of parts) {
+    if (value === null || value === void 0)
+      return void 0;
+    value = value[part];
+  }
+  return value;
+}
+function formatDisplayValue(value) {
+  if (value === null || value === void 0)
+    return "";
+  if (Array.isArray(value))
+    return value.join(", ");
+  if (typeof value === "object")
+    return JSON.stringify(value);
+  return String(value);
+}
+function evaluateCardStyle(doc, cardStyleFn) {
+  var _a, _b, _c, _d, _e;
+  if (!cardStyleFn)
+    return {};
+  try {
+    const result = cardStyleFn(doc.properties);
+    if (!result)
+      return {};
+    if (typeof result === "string")
+      return { color: result };
+    if (typeof result === "object") {
+      return {
+        color: (_a = result.color) != null ? _a : result.farbe,
+        background: (_b = result.background) != null ? _b : result.hintergrund,
+        border: (_c = result.border) != null ? _c : result.rahmen,
+        textColor: (_e = (_d = result.textColor) != null ? _d : result.textFarbe) != null ? _e : result.text
+      };
+    }
+  } catch (e) {
+    console.error("Hermione: card-style evaluation error for", doc.name, e);
+  }
+  return {};
+}
+function getDocumentColor(name) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue}, 70%, 60%)`;
+}
+function findBinCell(value, cellValues) {
+  const nums = cellValues.map((v) => parseFloat(String(v))).filter((n) => !isNaN(n)).sort((a, b) => a - b);
+  if (nums.length === 0)
+    return null;
+  let bin = null;
+  for (const cv of nums) {
+    if (cv <= value)
+      bin = cv;
+    else
+      break;
+  }
+  if (bin === null)
+    bin = nums[0];
+  return bin;
+}
+function matchesCellValue(rawValue, cellValue, transformFn, isExact, allCellValues) {
+  const transformed = applyTransform(rawValue, transformFn);
+  if (!isExact)
+    return String(transformed) === String(cellValue);
+  const numVal = parseFloat(String(transformed));
+  const numCell = parseFloat(String(cellValue));
+  if (isNaN(numVal) || isNaN(numCell))
+    return String(transformed) === String(cellValue);
+  const bin = findBinCell(numVal, allCellValues);
+  return bin !== null && String(bin) === String(cellValue);
+}
+function findValueIndex(rawValue, axisValues, transformFn, isExact) {
+  for (let i = 0; i < axisValues.length; i++) {
+    if (matchesCellValue(rawValue, axisValues[i], transformFn, isExact, axisValues)) {
+      return i;
+    }
+  }
+  return -1;
+}
+function isRangeDoc(doc, config) {
+  if (config.xAxisEnd) {
+    const endVal = getPropertyValue(doc.properties, config.xAxisEnd);
+    if (endVal !== void 0 && endVal !== null && endVal !== "")
+      return true;
+  }
+  if (config.yAxisEnd) {
+    const endVal = getPropertyValue(doc.properties, config.yAxisEnd);
+    if (endVal !== void 0 && endVal !== null && endVal !== "")
+      return true;
+  }
+  return false;
+}
+function assignRangeLanes(layouts) {
+  const overlaps = (a, b) => {
+    return a.xStartIdx <= b.xEndIdx && b.xStartIdx <= a.xEndIdx && a.yStartIdx <= b.yEndIdx && b.yStartIdx <= a.yEndIdx;
+  };
+  layouts.sort((a, b) => a.yStartIdx !== b.yStartIdx ? a.yStartIdx - b.yStartIdx : a.xStartIdx - b.xStartIdx);
+  for (const layout of layouts) {
+    const usedLanes = /* @__PURE__ */ new Set();
+    for (const other of layouts) {
+      if (other === layout)
+        continue;
+      if (other.lane >= 0 && overlaps(layout, other))
+        usedLanes.add(other.lane);
+    }
+    let lane = 0;
+    while (usedLanes.has(lane))
+      lane++;
+    layout.lane = lane;
+  }
+  for (const layout of layouts) {
+    let maxLane = layout.lane;
+    for (const other of layouts) {
+      if (other === layout)
+        continue;
+      if (overlaps(layout, other))
+        maxLane = Math.max(maxLane, other.lane);
+    }
+    layout.totalLanes = maxLane + 1;
+  }
+}
+function computeRangeLayouts(rangeDocs, xValues, yValues, config, xTransformFn, yTransformFn) {
+  const layouts = [];
+  for (const doc of rangeDocs) {
+    let xStartIdx = 0, xEndIdx = 0, hasXRange = false;
+    let yStartIdx = 0, yEndIdx = 0, hasYRange = false;
+    if (config.xAxis) {
+      const rawXStart = getPropertyValue(doc.properties, config.xAxis);
+      xStartIdx = findValueIndex(rawXStart, xValues, xTransformFn, !!config.xExact);
+      if (config.xAxisEnd) {
+        const rawXEnd = getPropertyValue(doc.properties, config.xAxisEnd);
+        if (rawXEnd !== void 0 && rawXEnd !== null && rawXEnd !== "") {
+          xEndIdx = findValueIndex(rawXEnd, xValues, xTransformFn, !!config.xExact);
+          hasXRange = xStartIdx >= 0 && xEndIdx >= 0;
+        }
+      }
+      if (!hasXRange) {
+        if (xStartIdx < 0)
+          continue;
+        xEndIdx = xStartIdx;
+      }
+      if (xStartIdx > xEndIdx)
+        [xStartIdx, xEndIdx] = [xEndIdx, xStartIdx];
+    }
+    if (config.yAxis) {
+      const rawYStart = getPropertyValue(doc.properties, config.yAxis);
+      yStartIdx = findValueIndex(rawYStart, yValues, yTransformFn, !!config.yExact);
+      if (config.yAxisEnd) {
+        const rawYEnd = getPropertyValue(doc.properties, config.yAxisEnd);
+        if (rawYEnd !== void 0 && rawYEnd !== null && rawYEnd !== "") {
+          yEndIdx = findValueIndex(rawYEnd, yValues, yTransformFn, !!config.yExact);
+          hasYRange = yStartIdx >= 0 && yEndIdx >= 0;
+        }
+      }
+      if (!hasYRange) {
+        if (yStartIdx < 0)
+          continue;
+        yEndIdx = yStartIdx;
+      }
+      if (yStartIdx > yEndIdx)
+        [yStartIdx, yEndIdx] = [yEndIdx, yStartIdx];
+    }
+    layouts.push({ doc, xStartIdx, xEndIdx, yStartIdx, yEndIdx, hasXRange, hasYRange, lane: -1, totalLanes: 1 });
+  }
+  assignRangeLanes(layouts);
+  return layouts;
+}
+function getCellRange(cellValue, allCellValues) {
+  const nums = allCellValues.map((v) => parseFloat(String(v))).filter((n) => !isNaN(n)).sort((a, b) => a - b);
+  const numCell = parseFloat(String(cellValue));
+  const idx = nums.indexOf(numCell);
+  const min = numCell;
+  const max = idx + 1 < nums.length ? nums[idx + 1] - 1 : numCell;
+  return [Math.min(min, max), Math.max(min, max)];
+}
+
+// src/canvas-renderer.ts
+var GAP = 8;
+var HEADER_PAD = 12;
+var CELL_PAD = 8;
+var CARD_MIN_H = 28;
+var CARD_PAD_V = 6;
+var LINE_HEIGHT = 16;
+var CARD_FONT = `500 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+var CARD_GAP = 6;
+var COLOR_BAR_W = 4;
+var CARD_RADIUS = 4;
+var CELL_RADIUS = 6;
+var HEADER_RADIUS = 4;
+var MIN_CELL_W = 150;
+var MIN_CELL_H = 100;
+var Y_HEADER_W = 110;
+var HANDLE_SIZE = 8;
+var DRAG_THRESHOLD = 5;
+var ZOOM_MIN = 50;
+var ZOOM_MAX = 150;
+var ZOOM_STEP = 10;
+var CanvasRenderer = class extends import_obsidian5.MarkdownRenderChild {
+  constructor(containerEl, app, config, result, onRefresh) {
+    super(containerEl);
+    this.app = app;
+    this.config = config;
+    this.result = result;
+    this.onRefresh = onRefresh;
+    this.dpr = 1;
+    // Layout data
+    this.cells = [];
+    this.xHeaders = [];
+    this.yHeaders = [];
+    this.cards = [];
+    this.totalW = 0;
+    this.totalH = 0;
+    // Axis values
+    this.xValues = [];
+    this.yValues = [];
+    this.isYOnly = false;
+    this.isSingleAxis = false;
+    // Transforms
+    this.xTransformFn = null;
+    this.yTransformFn = null;
+    this.xReverseMap = null;
+    this.yReverseMap = null;
+    this.cardStyleFn = null;
+    // Interaction state
+    this.zoomLevel = 100;
+    this.zoomDisplay = null;
+    this.previewEl = null;
+    this.previewTimeout = null;
+    this.hoveredCard = null;
+    this.dragState = null;
+    this.resizeState = null;
+    // Text measurement (offscreen)
+    this.measureCtx = null;
+    // Theme colors (resolved from CSS vars)
+    this.colors = {
+      bg: "#1e1e2e",
+      bgSecondary: "#313244",
+      bgPrimary: "#181825",
+      accent: "#89b4fa",
+      accentText: "#1e1e2e",
+      text: "#cdd6f4",
+      textMuted: "#a6adc8",
+      border: "#45475a",
+      borderHover: "#585b70",
+      cellBg: "#181825",
+      cellBorder: "#45475a",
+      headerXBg: "#89b4fa",
+      headerYBg: "#313244",
+      cardBg: "#313244",
+      dropActive: "rgba(137, 180, 250, 0.15)",
+      dropHover: "rgba(137, 180, 250, 0.3)"
+    };
+    this.onMouseDown = (e) => {
+      const pos = this.canvasToLayout(e.clientX, e.clientY);
+      const hit = this.hitTest(pos.x, pos.y);
+      if (!hit)
+        return;
+      if (hit.type === "handle") {
+        e.preventDefault();
+        this.resizeState = {
+          card: hit.card,
+          edge: hit.edge,
+          axis: hit.axis,
+          mousePos: hit.axis === "x" ? e.clientX : e.clientY
+        };
+        document.addEventListener("mousemove", this.onResizeMove);
+        document.addEventListener("mouseup", this.onResizeUp);
+        return;
+      }
+      if (hit.type === "card") {
+        const card = hit.card;
+        const hasX = !!this.config.xAxis;
+        const hasY = !!this.config.yAxis;
+        const fullyReadonly = hasX && hasY ? !!this.config.xReadonly && !!this.config.yReadonly : hasX ? !!this.config.xReadonly : !!this.config.yReadonly;
+        if (!fullyReadonly && !card.isRange) {
+          this.dragState = {
+            card,
+            startX: pos.x,
+            startY: pos.y,
+            currentX: pos.x,
+            currentY: pos.y,
+            dragging: false,
+            targetCell: null
+          };
+        }
+      }
+    };
+    this.onMouseMove = (e) => {
+      const pos = this.canvasToLayout(e.clientX, e.clientY);
+      if (this.dragState) {
+        this.dragState.currentX = pos.x;
+        this.dragState.currentY = pos.y;
+        if (!this.dragState.dragging) {
+          const dx = pos.x - this.dragState.startX;
+          const dy = pos.y - this.dragState.startY;
+          if (Math.sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD) {
+            this.dragState.dragging = true;
+          }
+        }
+        if (this.dragState.dragging) {
+          const targetCell = this.findCellAt(pos.x, pos.y);
+          if (targetCell) {
+            const doc = this.dragState.card.doc;
+            const docX = this.config.xAxis ? getPropertyValue(doc.properties, this.config.xAxis) : void 0;
+            const docY = this.config.yAxis ? getPropertyValue(doc.properties, this.config.yAxis) : void 0;
+            const docXStr = docX !== void 0 ? String(applyTransform(docX, this.xTransformFn)) : void 0;
+            const docYStr = docY !== void 0 ? String(applyTransform(docY, this.yTransformFn)) : void 0;
+            const xAllowed = !this.config.xReadonly || targetCell.xVal !== void 0 && String(targetCell.xVal) === docXStr;
+            const yAllowed = !this.config.yReadonly || targetCell.yVal !== void 0 && String(targetCell.yVal) === docYStr;
+            this.dragState.targetCell = xAllowed && yAllowed ? targetCell : null;
+          } else {
+            this.dragState.targetCell = null;
+          }
+          this.draw();
+        }
+        return;
+      }
+      const hit = this.hitTest(pos.x, pos.y);
+      let newHovered = null;
+      if ((hit == null ? void 0 : hit.type) === "card") {
+        newHovered = hit.card;
+        this.canvas.style.cursor = hit.card.isRange ? "pointer" : "grab";
+      } else if ((hit == null ? void 0 : hit.type) === "handle") {
+        newHovered = hit.card;
+        this.canvas.style.cursor = hit.axis === "x" ? "col-resize" : "row-resize";
+      } else {
+        this.canvas.style.cursor = "default";
+      }
+      if (newHovered !== this.hoveredCard) {
+        this.hoveredCard = newHovered;
+        this.draw();
+        if (newHovered) {
+          this.schedulePreview(newHovered.doc, e);
+        } else {
+          this.hidePreview();
+        }
+      } else if (this.previewEl && newHovered) {
+        this.positionPreview(e);
+      }
+    };
+    this.onMouseUp = (e) => {
+      if (this.dragState) {
+        if (this.dragState.dragging && this.dragState.targetCell) {
+          this.executeDrop(this.dragState.card.doc, this.dragState.targetCell);
+        } else if (!this.dragState.dragging) {
+          this.app.workspace.openLinkText(this.dragState.card.doc.path, "");
+        }
+        this.dragState = null;
+        this.draw();
+        return;
+      }
+      const pos = this.canvasToLayout(e.clientX, e.clientY);
+      const hit = this.hitTest(pos.x, pos.y);
+      if ((hit == null ? void 0 : hit.type) === "card") {
+        this.app.workspace.openLinkText(hit.card.doc.path, "");
+      }
+    };
+    this.onMouseLeave = () => {
+      if (this.dragState) {
+        this.dragState = null;
+        this.draw();
+      }
+      this.hoveredCard = null;
+      this.hidePreview();
+      this.draw();
+    };
+    this.onWheel = (e) => {
+      if (e.ctrlKey) {
+        e.preventDefault();
+        if (e.deltaY < 0 && this.zoomLevel < ZOOM_MAX) {
+          this.zoomLevel += ZOOM_STEP;
+        } else if (e.deltaY > 0 && this.zoomLevel > ZOOM_MIN) {
+          this.zoomLevel -= ZOOM_STEP;
+        }
+        this.applyCanvasSize();
+        this.draw();
+        this.updateZoomDisplay();
+      }
+    };
+    // ── Resize Handlers ──────────────────────────────────────────────
+    this.onResizeMove = (e) => {
+      if (!this.resizeState)
+        return;
+      this.resizeState.mousePos = this.resizeState.axis === "x" ? e.clientX : e.clientY;
+      const pos = this.canvasToLayout(e.clientX, e.clientY);
+      const closestIdx = this.findClosestCellByPos(pos.x, pos.y, this.resizeState.axis);
+      if (closestIdx >= 0) {
+        const card = this.resizeState.card;
+        const axis = this.resizeState.axis;
+        const edge = this.resizeState.edge;
+        const targetCell = this.cells.find((c) => (axis === "x" ? c.xIdx : c.yIdx) === closestIdx);
+        if (targetCell) {
+          if (axis === "x") {
+            if (edge === "start") {
+              const right = card.rect.x + card.rect.w;
+              card.rect.x = targetCell.rect.x;
+              card.rect.w = right - card.rect.x;
+            } else {
+              card.rect.w = targetCell.rect.x + targetCell.rect.w - card.rect.x;
+            }
+          } else {
+            if (edge === "start") {
+              const bottom = card.rect.y + card.rect.h;
+              card.rect.y = targetCell.rect.y;
+              card.rect.h = bottom - card.rect.y;
+            } else {
+              card.rect.h = targetCell.rect.y + targetCell.rect.h - card.rect.y;
+            }
+          }
+          this.draw();
+        }
+      }
+    };
+    this.onResizeUp = async (e) => {
+      document.removeEventListener("mousemove", this.onResizeMove);
+      document.removeEventListener("mouseup", this.onResizeUp);
+      if (!this.resizeState)
+        return;
+      const pos = this.canvasToLayout(e.clientX, e.clientY);
+      const axis = this.resizeState.axis;
+      const edge = this.resizeState.edge;
+      const closestIdx = this.findClosestCellByPos(pos.x, pos.y, axis);
+      if (closestIdx >= 0) {
+        const allValues = axis === "x" ? this.xValues : this.yValues;
+        if (closestIdx < allValues.length) {
+          const newValue = allValues[closestIdx];
+          const property = edge === "start" ? axis === "x" ? this.config.xAxis : this.config.yAxis : axis === "x" ? this.config.xAxisEnd : this.config.yAxisEnd;
+          try {
+            const writeValue = await this.resolveDropValue(
+              newValue,
+              axis === "x" ? this.xTransformFn : this.yTransformFn,
+              axis === "x" ? this.xReverseMap : this.yReverseMap,
+              property
+            );
+            if (writeValue !== null) {
+              await this.updater.updateProperties(this.resizeState.card.doc.file, { [property]: writeValue });
+              this.refreshOnCacheUpdate(this.resizeState.card.doc.file);
+            }
+          } catch (error) {
+            console.error("Hermione: Failed to update range:", error);
+          }
+        }
+      }
+      this.resizeState = null;
+    };
+    this.updater = new FrontmatterUpdater(app);
+  }
+  onload() {
+    if (this.config.xTransform) {
+      this.xTransformFn = compileTransform(this.config.xTransform);
+      if (this.xTransformFn && this.result.xAxisRawValues) {
+        this.xReverseMap = buildReverseMap(this.result.xAxisRawValues, this.xTransformFn);
+      }
+    }
+    if (this.config.yTransform) {
+      this.yTransformFn = compileTransform(this.config.yTransform);
+      if (this.yTransformFn && this.result.yAxisRawValues) {
+        this.yReverseMap = buildReverseMap(this.result.yAxisRawValues, this.yTransformFn);
+      }
+    }
+    if (this.config.cardStyle) {
+      this.cardStyleFn = compileTransform(this.config.cardStyle);
+    }
+    this.render();
+  }
+  onunload() {
+    this.hidePreview();
+  }
+  // ── Main Render ──────────────────────────────────────────────────
+  render() {
+    this.containerEl.empty();
+    this.containerEl.addClass("hermione-container");
+    if (this.config.theme) {
+      this.containerEl.addClass(`hermione-theme-${this.config.theme}`);
+    }
+    if (this.config.title) {
+      this.containerEl.createEl("h3", { cls: "hermione-title", text: this.config.title });
+    }
+    if (this.result.errors.length > 0) {
+      const errorContainer = this.containerEl.createDiv({ cls: "hermione-errors" });
+      for (const error of this.result.errors) {
+        errorContainer.createDiv({ cls: "hermione-error", text: error });
+      }
+      return;
+    }
+    if (this.result.documents.length === 0) {
+      this.containerEl.createDiv({ cls: "hermione-empty", text: "Keine Dokumente gefunden." });
+      return;
+    }
+    this.resolveColors();
+    this.isYOnly = !this.config.xAxis && !!this.config.yAxis;
+    this.isSingleAxis = !this.config.xAxis || !this.config.yAxis;
+    this.xValues = this.config.xValues ? this.config.xValues : Array.from(this.result.xAxisValues).sort();
+    this.yValues = this.config.yValues ? this.config.yValues : Array.from(this.result.yAxisValues).sort();
+    this.calculateLayout();
+    const wrapper = this.containerEl.createDiv({ cls: "hermione-canvas-wrapper" });
+    if (!this.isSingleAxis && this.config.yLabel) {
+      const yLabelEl = wrapper.createDiv({ cls: "hermione-axis-label-y" });
+      yLabelEl.createSpan({ text: this.config.yLabel });
+    }
+    const canvasContainer = wrapper.createDiv({ cls: "hermione-canvas-container" });
+    this.dpr = window.devicePixelRatio || 1;
+    this.canvas = document.createElement("canvas");
+    this.canvas.classList.add("hermione-canvas");
+    canvasContainer.appendChild(this.canvas);
+    const ctx = this.canvas.getContext("2d");
+    if (!ctx)
+      return;
+    this.ctx = ctx;
+    this.applyCanvasSize();
+    this.draw();
+    this.setupEventListeners();
+    if (this.config.xLabel || this.isSingleAxis && (this.config.xLabel || this.config.yLabel)) {
+      const label = this.isSingleAxis ? this.isYOnly ? this.config.yLabel || this.config.xLabel : this.config.xLabel || this.config.yLabel : this.config.xLabel;
+      if (label) {
+        const xLabelEl = canvasContainer.createDiv({ cls: "hermione-canvas-xlabel" });
+        xLabelEl.createSpan({ text: label });
+      }
+    }
+    this.renderUnassigned();
+    this.renderToolbar();
+  }
+  // ── Color Resolution ─────────────────────────────────────────────
+  resolveColors() {
+    const el = this.containerEl;
+    const cs = getComputedStyle(el);
+    const get = (v, fallback) => {
+      const val = cs.getPropertyValue(v).trim();
+      return val || fallback;
+    };
+    this.colors.bg = get("--background-secondary", "#313244");
+    this.colors.bgSecondary = get("--background-secondary", "#313244");
+    this.colors.bgPrimary = get("--background-primary", "#181825");
+    this.colors.accent = get("--interactive-accent", "#89b4fa");
+    this.colors.accentText = get("--text-on-accent", "#1e1e2e");
+    this.colors.text = get("--text-normal", "#cdd6f4");
+    this.colors.textMuted = get("--text-muted", "#a6adc8");
+    this.colors.border = get("--background-modifier-border", "#45475a");
+    this.colors.borderHover = get("--background-modifier-border-hover", "#585b70");
+    this.colors.cellBg = this.colors.bgPrimary;
+    this.colors.cellBorder = this.colors.border;
+    this.colors.headerXBg = this.colors.accent;
+    this.colors.headerYBg = this.colors.bgSecondary;
+    this.colors.cardBg = this.colors.bgSecondary;
+    if (this.config.theme === "glass") {
+      this.colors.cellBg = "rgba(255,255,255,0.02)";
+      this.colors.cellBorder = "rgba(255,255,255,0.06)";
+      this.colors.headerXBg = "rgba(137,180,250,0.2)";
+      this.colors.headerYBg = "rgba(255,255,255,0.06)";
+      this.colors.cardBg = "rgba(255,255,255,0.08)";
+      this.colors.bg = "rgba(255,255,255,0.03)";
+      this.colors.dropActive = "rgba(137,180,250,0.06)";
+      this.colors.dropHover = "rgba(137,180,250,0.12)";
+    }
+  }
+  // ── Text Measurement ─────────────────────────────────────────────
+  getMeasureCtx() {
+    if (!this.measureCtx) {
+      const offscreen = document.createElement("canvas");
+      this.measureCtx = offscreen.getContext("2d");
+    }
+    return this.measureCtx;
+  }
+  wrapText(text, maxWidth) {
+    if (maxWidth <= 0)
+      return [text];
+    const ctx = this.getMeasureCtx();
+    ctx.font = CARD_FONT;
+    if (ctx.measureText(text).width <= maxWidth)
+      return [text];
+    const words = text.split(/\s+/);
+    const lines = [];
+    let currentLine = "";
+    for (const word of words) {
+      const testLine = currentLine ? currentLine + " " + word : word;
+      if (ctx.measureText(testLine).width > maxWidth && currentLine) {
+        lines.push(currentLine);
+        currentLine = word;
+      } else {
+        currentLine = testLine;
+      }
+    }
+    if (currentLine)
+      lines.push(currentLine);
+    return lines.length > 0 ? lines : [""];
+  }
+  measureCard(name, cardWidth) {
+    const textMaxW = cardWidth - COLOR_BAR_W - 16;
+    const lines = this.wrapText(name, textMaxW);
+    const height = Math.max(CARD_MIN_H, CARD_PAD_V * 2 + lines.length * LINE_HEIGHT);
+    return { lines, height };
+  }
+  // ── Value-to-Pixel Interpolation ─────────────────────────────────
+  /**
+   * Maps a raw numeric value to an exact pixel position on the given axis.
+   * Uses linear interpolation across the full grid extent:
+   *   first axis value → center of first cell
+   *   last axis value  → center of last cell
+   * Values outside the range are extrapolated.
+   */
+  interpolatePosition(rawValue, axisValues, axis) {
+    if (isNaN(rawValue)) {
+      console.warn("Hermione interp: rawValue is NaN");
+      return null;
+    }
+    const entries = [];
+    for (let i = 0; i < axisValues.length; i++) {
+      const v = parseFloat(String(axisValues[i]));
+      if (isNaN(v))
+        continue;
+      const cell = this.cells.find(
+        (c) => axis === "x" ? c.xIdx === i : c.yIdx === i
+      );
+      if (!cell)
+        continue;
+      entries.push({
+        val: v,
+        center: axis === "x" ? cell.rect.x + cell.rect.w / 2 : cell.rect.y + cell.rect.h / 2
+      });
+    }
+    console.warn("Hermione interp:", { rawValue, axis, entriesLen: entries.length, axisValuesLen: axisValues.length, cellsLen: this.cells.length });
+    if (entries.length < 2) {
+      console.warn("Hermione interp: entries < 2, returning null");
+      return null;
+    }
+    entries.sort((a, b) => a.val - b.val);
+    const first = entries[0];
+    const last = entries[entries.length - 1];
+    if (first.val === last.val)
+      return null;
+    const t = (rawValue - first.val) / (last.val - first.val);
+    const result = first.center + t * (last.center - first.center);
+    console.warn("Hermione interp result:", { rawValue, first: first.val, last: last.val, t, result });
+    return result;
+  }
+  // ── Layout Calculation ───────────────────────────────────────────
+  calculateLayout() {
+    this.cells = [];
+    this.xHeaders = [];
+    this.yHeaders = [];
+    this.cards = [];
+    if (this.isSingleAxis) {
+      this.calculateSingleAxisLayout();
+    } else {
+      this.calculateMatrixLayout();
+    }
+  }
+  calculateMatrixLayout() {
+    const xCount = this.xValues.length;
+    const yCount = this.yValues.length;
+    if (xCount === 0 || yCount === 0)
+      return;
+    const cellW = Math.max(MIN_CELL_W, 180);
+    const headerH = 44;
+    const hasRangeConfig = !!this.config.xAxisEnd || !!this.config.yAxisEnd;
+    const rangeDocs = hasRangeConfig ? this.result.documents.filter((doc) => isRangeDoc(doc, this.config)) : [];
+    const rangeDocPaths = new Set(rangeDocs.map((d) => d.path));
+    const cellDocs = [];
+    for (let yi = 0; yi < yCount; yi++) {
+      cellDocs[yi] = [];
+      for (let xi = 0; xi < xCount; xi++) {
+        cellDocs[yi][xi] = this.result.documents.filter((doc) => {
+          if (rangeDocPaths.has(doc.path))
+            return false;
+          const rawX = getPropertyValue(doc.properties, this.config.xAxis);
+          const rawY = getPropertyValue(doc.properties, this.config.yAxis);
+          const xMatch = Array.isArray(rawX) ? rawX.some((v) => matchesCellValue(v, this.xValues[xi], this.xTransformFn, !!this.config.xExact, this.xValues)) : matchesCellValue(rawX, this.xValues[xi], this.xTransformFn, !!this.config.xExact, this.xValues);
+          const yMatch = Array.isArray(rawY) ? rawY.some((v) => matchesCellValue(v, this.yValues[yi], this.yTransformFn, !!this.config.yExact, this.yValues)) : matchesCellValue(rawY, this.yValues[yi], this.yTransformFn, !!this.config.yExact, this.yValues);
+          return xMatch && yMatch;
+        });
+      }
+    }
+    const cardW = cellW - CELL_PAD * 2;
+    const cardMeasurements = [];
+    for (let yi = 0; yi < yCount; yi++) {
+      cardMeasurements[yi] = [];
+      for (let xi = 0; xi < xCount; xi++) {
+        cardMeasurements[yi][xi] = cellDocs[yi][xi].map(
+          (doc) => this.measureCard(doc.name, cardW)
+        );
+      }
+    }
+    const rowHeights = [];
+    for (let yi = 0; yi < yCount; yi++) {
+      let maxContentH = 0;
+      for (let xi = 0; xi < xCount; xi++) {
+        const measurements = cardMeasurements[yi][xi];
+        if (measurements.length > 0) {
+          const totalCardH = measurements.reduce((sum, m) => sum + m.height, 0);
+          const totalGap = (measurements.length - 1) * CARD_GAP;
+          maxContentH = Math.max(maxContentH, totalCardH + totalGap + CELL_PAD * 2);
+        }
+      }
+      rowHeights[yi] = Math.max(MIN_CELL_H, maxContentH);
+    }
+    const originX = GAP;
+    const originY = GAP;
+    let curY = originY;
+    const xHeaderY = curY;
+    for (let xi = 0; xi < xCount; xi++) {
+      const x = originX + Y_HEADER_W + GAP + xi * (cellW + GAP);
+      this.xHeaders.push({
+        rect: { x, y: xHeaderY, w: cellW, h: headerH },
+        label: String(this.xValues[xi]),
+        axis: "x"
+      });
+    }
+    curY += headerH + GAP;
+    for (let yi = 0; yi < yCount; yi++) {
+      const rowH = rowHeights[yi];
+      this.yHeaders.push({
+        rect: { x: originX, y: curY, w: Y_HEADER_W, h: rowH },
+        label: String(this.yValues[yi]),
+        axis: "y"
+      });
+      for (let xi = 0; xi < xCount; xi++) {
+        const cx = originX + Y_HEADER_W + GAP + xi * (cellW + GAP);
+        const cellRect = { x: cx, y: curY, w: cellW, h: rowH };
+        this.cells.push({
+          rect: cellRect,
+          xVal: this.xValues[xi],
+          yVal: this.yValues[yi],
+          xIdx: xi,
+          yIdx: yi
+        });
+        const docs = cellDocs[yi][xi];
+        const measurements = cardMeasurements[yi][xi];
+        let cardOffsetY = 0;
+        for (let di = 0; di < docs.length; di++) {
+          const m = measurements[di];
+          const cardX = cx + CELL_PAD;
+          const cardY = curY + CELL_PAD + cardOffsetY;
+          const style = evaluateCardStyle(docs[di], this.cardStyleFn);
+          this.cards.push({
+            doc: docs[di],
+            rect: { x: cardX, y: cardY, w: cardW, h: m.height },
+            style,
+            colorBarColor: style.color || getDocumentColor(docs[di].name),
+            isRange: false,
+            isVertical: false,
+            textLines: m.lines
+          });
+          cardOffsetY += m.height + CARD_GAP;
+        }
+      }
+      curY += rowH + GAP;
+    }
+    if (rangeDocs.length > 0) {
+      const layouts = computeRangeLayouts(rangeDocs, this.xValues, this.yValues, this.config, this.xTransformFn, this.yTransformFn);
+      const rangeGap = 2;
+      for (const layout of layouts) {
+        const startCell = this.findCell(layout.xStartIdx, layout.yStartIdx);
+        const endCell = this.findCell(layout.xEndIdx, layout.yEndIdx);
+        if (!startCell || !endCell)
+          continue;
+        let left = startCell.rect.x;
+        let top = startCell.rect.y;
+        let right = endCell.rect.x + endCell.rect.w;
+        let bottom = endCell.rect.y + endCell.rect.h;
+        console.warn("Hermione range card:", { doc: layout.doc.name, hasXRange: layout.hasXRange, hasYRange: layout.hasYRange, xAxis: this.config.xAxis, xAxisEnd: this.config.xAxisEnd, yAxis: this.config.yAxis, yAxisEnd: this.config.yAxisEnd });
+        if (layout.hasXRange && this.config.xAxis && this.config.xAxisEnd) {
+          const rawStart = getPropertyValue(layout.doc.properties, this.config.xAxis);
+          const rawEnd = getPropertyValue(layout.doc.properties, this.config.xAxisEnd);
+          const displayStart = applyTransform(rawStart, this.xTransformFn);
+          const displayEnd = applyTransform(rawEnd, this.xTransformFn);
+          const p1 = this.interpolatePosition(parseFloat(String(displayStart)), this.xValues, "x");
+          const p2 = this.interpolatePosition(parseFloat(String(displayEnd)), this.xValues, "x");
+          if (p1 !== null && p2 !== null) {
+            left = Math.min(p1, p2);
+            right = Math.max(p1, p2);
+          }
+        }
+        if (layout.hasYRange && this.config.yAxis && this.config.yAxisEnd) {
+          const rawStart = getPropertyValue(layout.doc.properties, this.config.yAxis);
+          const rawEnd = getPropertyValue(layout.doc.properties, this.config.yAxisEnd);
+          const displayStart = applyTransform(rawStart, this.yTransformFn);
+          const displayEnd = applyTransform(rawEnd, this.yTransformFn);
+          const p1 = this.interpolatePosition(parseFloat(String(displayStart)), this.yValues, "y");
+          const p2 = this.interpolatePosition(parseFloat(String(displayEnd)), this.yValues, "y");
+          if (p1 !== null && p2 !== null) {
+            top = Math.min(p1, p2);
+            bottom = Math.max(p1, p2);
+          }
+        }
+        const totalWidth = right - left;
+        const totalHeight = bottom - top;
+        const stackVertically = layout.hasXRange || !layout.hasYRange;
+        const isVertical = layout.hasYRange && !layout.hasXRange;
+        let cardRect;
+        if (stackVertically) {
+          const laneH = (totalHeight - (layout.totalLanes - 1) * rangeGap) / layout.totalLanes;
+          cardRect = {
+            x: left,
+            y: top + layout.lane * (laneH + rangeGap),
+            w: totalWidth,
+            h: laneH
+          };
+        } else {
+          const laneW = (totalWidth - (layout.totalLanes - 1) * rangeGap) / layout.totalLanes;
+          cardRect = {
+            x: left + layout.lane * (laneW + rangeGap),
+            y: top,
+            w: laneW,
+            h: totalHeight
+          };
+        }
+        const style = evaluateCardStyle(layout.doc, this.cardStyleFn);
+        const textMaxW = cardRect.w - COLOR_BAR_W - 16;
+        const textLines = this.wrapText(layout.doc.name, textMaxW);
+        this.cards.push({
+          doc: layout.doc,
+          rect: cardRect,
+          style,
+          colorBarColor: style.color || getDocumentColor(layout.doc.name),
+          isRange: true,
+          isVertical,
+          rangeLayout: layout,
+          textLines
+        });
+      }
+    }
+    this.totalW = originX + Y_HEADER_W + GAP + xCount * (cellW + GAP) + GAP;
+    this.totalH = curY + GAP;
+  }
+  calculateSingleAxisLayout() {
+    const axisProperty = this.isYOnly ? this.config.yAxis : this.config.xAxis;
+    const axisValues = this.isYOnly ? this.yValues : this.xValues;
+    const transformFn = this.isYOnly ? this.yTransformFn : this.xTransformFn;
+    const isExact = this.isYOnly ? !!this.config.yExact : !!this.config.xExact;
+    const rangeEndProp = this.isYOnly ? this.config.yAxisEnd : this.config.xAxisEnd;
+    const hasRangeConfig = !!rangeEndProp;
+    const rangeDocs = hasRangeConfig ? this.result.documents.filter((doc) => isRangeDoc(doc, this.config)) : [];
+    const rangeDocPaths = new Set(rangeDocs.map((d) => d.path));
+    const axisDocs = [];
+    for (let i = 0; i < axisValues.length; i++) {
+      axisDocs[i] = this.result.documents.filter((doc) => {
+        if (rangeDocPaths.has(doc.path))
+          return false;
+        const raw = getPropertyValue(doc.properties, axisProperty);
+        return Array.isArray(raw) ? raw.some((v) => matchesCellValue(v, axisValues[i], transformFn, isExact, axisValues)) : matchesCellValue(raw, axisValues[i], transformFn, isExact, axisValues);
+      });
+    }
+    const originX = GAP;
+    const originY = GAP;
+    if (this.isYOnly) {
+      const cellW = Math.max(MIN_CELL_W, 300);
+      const cardW = cellW - CELL_PAD * 2;
+      const headerH = 44;
+      let curY = originY;
+      for (let i = 0; i < axisValues.length; i++) {
+        const docs = axisDocs[i];
+        const measurements = docs.map((doc) => this.measureCard(doc.name, cardW));
+        const totalCardH = measurements.reduce((sum, m) => sum + m.height, 0);
+        const totalGap = Math.max(0, docs.length - 1) * CARD_GAP;
+        const contentH = docs.length > 0 ? totalCardH + totalGap + CELL_PAD * 2 : CELL_PAD * 2;
+        const rowH = Math.max(60, contentH);
+        this.yHeaders.push({
+          rect: { x: originX, y: curY, w: Y_HEADER_W, h: rowH },
+          label: String(axisValues[i]),
+          axis: "y"
+        });
+        const cx = originX + Y_HEADER_W + GAP;
+        const cellRect = { x: cx, y: curY, w: cellW, h: rowH };
+        this.cells.push({
+          rect: cellRect,
+          xVal: void 0,
+          yVal: axisValues[i],
+          xIdx: -1,
+          yIdx: i
+        });
+        let cardOffsetY = 0;
+        for (let di = 0; di < docs.length; di++) {
+          const m = measurements[di];
+          const cardX = cx + CELL_PAD;
+          const cardY = curY + CELL_PAD + cardOffsetY;
+          const style = evaluateCardStyle(docs[di], this.cardStyleFn);
+          this.cards.push({
+            doc: docs[di],
+            rect: { x: cardX, y: cardY, w: cardW, h: m.height },
+            style,
+            colorBarColor: style.color || getDocumentColor(docs[di].name),
+            isRange: false,
+            isVertical: false,
+            textLines: m.lines
+          });
+          cardOffsetY += m.height + CARD_GAP;
+        }
+        curY += rowH + GAP;
+      }
+      this.totalW = originX + Y_HEADER_W + GAP + cellW + GAP;
+      this.totalH = curY + GAP;
+      if (rangeDocs.length > 0) {
+        this.addSingleAxisRangeCards(rangeDocs, axisValues, "y");
+      }
+    } else {
+      const cellW = Math.max(MIN_CELL_W, 180);
+      const headerH = 44;
+      let curY = originY;
+      for (let i = 0; i < axisValues.length; i++) {
+        const x = originX + i * (cellW + GAP);
+        this.xHeaders.push({
+          rect: { x, y: curY, w: cellW, h: headerH },
+          label: String(axisValues[i]),
+          axis: "x"
+        });
+      }
+      curY += headerH + GAP;
+      const cardW = cellW - CELL_PAD * 2;
+      const axisMeasurements = [];
+      let maxContentH = 0;
+      for (let i = 0; i < axisValues.length; i++) {
+        const measurements = axisDocs[i].map((doc) => this.measureCard(doc.name, cardW));
+        axisMeasurements[i] = measurements;
+        if (measurements.length > 0) {
+          const totalCardH = measurements.reduce((sum, m) => sum + m.height, 0);
+          const totalGap = (measurements.length - 1) * CARD_GAP;
+          maxContentH = Math.max(maxContentH, totalCardH + totalGap + CELL_PAD * 2);
+        }
+      }
+      const rowH = Math.max(120, maxContentH);
+      for (let i = 0; i < axisValues.length; i++) {
+        const cx = originX + i * (cellW + GAP);
+        const cellRect = { x: cx, y: curY, w: cellW, h: rowH };
+        this.cells.push({
+          rect: cellRect,
+          xVal: axisValues[i],
+          yVal: void 0,
+          xIdx: i,
+          yIdx: -1
+        });
+        const docs = axisDocs[i];
+        const measurements = axisMeasurements[i];
+        let cardOffsetY = 0;
+        for (let di = 0; di < docs.length; di++) {
+          const m = measurements[di];
+          const cardX = cx + CELL_PAD;
+          const cardY = curY + CELL_PAD + cardOffsetY;
+          const style = evaluateCardStyle(docs[di], this.cardStyleFn);
+          this.cards.push({
+            doc: docs[di],
+            rect: { x: cardX, y: cardY, w: cardW, h: m.height },
+            style,
+            colorBarColor: style.color || getDocumentColor(docs[di].name),
+            isRange: false,
+            isVertical: false,
+            textLines: m.lines
+          });
+          cardOffsetY += m.height + CARD_GAP;
+        }
+      }
+      curY += rowH + GAP;
+      this.totalW = originX + axisValues.length * (cellW + GAP) + GAP;
+      this.totalH = curY + GAP;
+      if (rangeDocs.length > 0) {
+        this.addSingleAxisRangeCards(rangeDocs, axisValues, "x");
+      }
+    }
+  }
+  addSingleAxisRangeCards(rangeDocs, axisValues, axis) {
+    const axisProperty = axis === "x" ? this.config.xAxis : this.config.yAxis;
+    const axisEndProperty = axis === "x" ? this.config.xAxisEnd : this.config.yAxisEnd;
+    const transformFn = axis === "x" ? this.xTransformFn : this.yTransformFn;
+    const isExact = axis === "x" ? !!this.config.xExact : !!this.config.yExact;
+    const layouts = [];
+    for (const doc of rangeDocs) {
+      const rawStart = getPropertyValue(doc.properties, axisProperty);
+      const rawEnd = getPropertyValue(doc.properties, axisEndProperty);
+      let startIdx = findValueIndex(rawStart, axisValues, transformFn, isExact);
+      let endIdx = findValueIndex(rawEnd, axisValues, transformFn, isExact);
+      if (startIdx < 0 || endIdx < 0)
+        continue;
+      if (startIdx > endIdx)
+        [startIdx, endIdx] = [endIdx, startIdx];
+      layouts.push({ doc, startIdx, endIdx, lane: -1, totalLanes: 1 });
+    }
+    const overlaps = (a, b) => a.startIdx <= b.endIdx && b.startIdx <= a.endIdx;
+    layouts.sort((a, b) => a.startIdx - b.startIdx);
+    for (const layout of layouts) {
+      const usedLanes = /* @__PURE__ */ new Set();
+      for (const other of layouts) {
+        if (other === layout)
+          continue;
+        if (other.lane >= 0 && overlaps(layout, other))
+          usedLanes.add(other.lane);
+      }
+      let lane = 0;
+      while (usedLanes.has(lane))
+        lane++;
+      layout.lane = lane;
+    }
+    for (const layout of layouts) {
+      let maxLane = layout.lane;
+      for (const other of layouts) {
+        if (other === layout)
+          continue;
+        if (overlaps(layout, other))
+          maxLane = Math.max(maxLane, other.lane);
+      }
+      layout.totalLanes = maxLane + 1;
+    }
+    const rangeGap = 2;
+    for (const layout of layouts) {
+      const startCell = this.cells.find((c) => (axis === "x" ? c.xIdx : c.yIdx) === layout.startIdx);
+      const endCell = this.cells.find((c) => (axis === "x" ? c.xIdx : c.yIdx) === layout.endIdx);
+      if (!startCell || !endCell)
+        continue;
+      let cardRect;
+      const isVertical = axis === "y";
+      const rawStart = getPropertyValue(layout.doc.properties, axisProperty);
+      const rawEnd = getPropertyValue(layout.doc.properties, axisEndProperty);
+      const displayStart = applyTransform(rawStart, transformFn);
+      const displayEnd = applyTransform(rawEnd, transformFn);
+      console.warn("Hermione single-axis range:", { doc: layout.doc.name, rawStart, rawEnd, displayStart, displayEnd, axisProperty, axisEndProperty, axis });
+      const p1 = this.interpolatePosition(parseFloat(String(displayStart)), axisValues, axis);
+      const p2 = this.interpolatePosition(parseFloat(String(displayEnd)), axisValues, axis);
+      console.warn("Hermione single-axis interp results:", { p1, p2 });
+      if (axis === "x") {
+        const interpLeft = p1 !== null && p2 !== null ? Math.min(p1, p2) : startCell.rect.x;
+        const interpRight = p1 !== null && p2 !== null ? Math.max(p1, p2) : endCell.rect.x + endCell.rect.w;
+        const top = startCell.rect.y;
+        const cellHeight = startCell.rect.h;
+        const laneH = (cellHeight - (layout.totalLanes - 1) * rangeGap) / layout.totalLanes;
+        cardRect = {
+          x: interpLeft,
+          y: top + layout.lane * (laneH + rangeGap),
+          w: interpRight - interpLeft,
+          h: laneH
+        };
+      } else {
+        const interpTop = p1 !== null && p2 !== null ? Math.min(p1, p2) : startCell.rect.y;
+        const interpBottom = p1 !== null && p2 !== null ? Math.max(p1, p2) : endCell.rect.y + endCell.rect.h;
+        const left = startCell.rect.x;
+        const cellWidth = startCell.rect.w;
+        const laneW = (cellWidth - (layout.totalLanes - 1) * rangeGap) / layout.totalLanes;
+        cardRect = {
+          x: left + layout.lane * (laneW + rangeGap),
+          y: interpTop,
+          w: laneW,
+          h: interpBottom - interpTop
+        };
+      }
+      const style = evaluateCardStyle(layout.doc, this.cardStyleFn);
+      const textMaxW = cardRect.w - COLOR_BAR_W - 16;
+      const textLines = this.wrapText(layout.doc.name, textMaxW);
+      this.cards.push({
+        doc: layout.doc,
+        rect: cardRect,
+        style,
+        colorBarColor: style.color || getDocumentColor(layout.doc.name),
+        isRange: true,
+        isVertical,
+        textLines,
+        rangeLayout: {
+          doc: layout.doc,
+          xStartIdx: axis === "x" ? layout.startIdx : 0,
+          xEndIdx: axis === "x" ? layout.endIdx : 0,
+          yStartIdx: axis === "y" ? layout.startIdx : 0,
+          yEndIdx: axis === "y" ? layout.endIdx : 0,
+          hasXRange: axis === "x",
+          hasYRange: axis === "y",
+          lane: layout.lane,
+          totalLanes: layout.totalLanes
+        }
+      });
+    }
+  }
+  findCell(xIdx, yIdx) {
+    return this.cells.find((c) => c.xIdx === xIdx && c.yIdx === yIdx);
+  }
+  // ── Canvas Size ──────────────────────────────────────────────────
+  applyCanvasSize() {
+    const scale = this.zoomLevel / 100;
+    const w = this.totalW * scale;
+    const h = this.totalH * scale;
+    this.canvas.style.width = `${w}px`;
+    this.canvas.style.height = `${h}px`;
+    this.canvas.width = Math.ceil(w * this.dpr);
+    this.canvas.height = Math.ceil(h * this.dpr);
+  }
+  // ── Drawing ──────────────────────────────────────────────────────
+  draw() {
+    var _a, _b, _c;
+    const ctx = this.ctx;
+    const scale = this.zoomLevel / 100 * this.dpr;
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    ctx.clearRect(0, 0, this.totalW, this.totalH);
+    this.drawRoundRect(0, 0, this.totalW, this.totalH, 8, this.colors.bg);
+    for (const cell of this.cells) {
+      const isDropTarget = ((_a = this.dragState) == null ? void 0 : _a.dragging) && this.dragState.targetCell === cell;
+      const fillColor = isDropTarget ? this.colors.dropHover : this.colors.cellBg;
+      const strokeColor = isDropTarget ? this.colors.accent : this.colors.cellBorder;
+      this.drawRoundRectStroke(cell.rect.x, cell.rect.y, cell.rect.w, cell.rect.h, CELL_RADIUS, fillColor, strokeColor, isDropTarget ? 2 : 1, true);
+    }
+    for (const h of this.xHeaders) {
+      this.drawRoundRect(h.rect.x, h.rect.y, h.rect.w, h.rect.h, HEADER_RADIUS, this.colors.headerXBg);
+      ctx.fillStyle = this.colors.accentText;
+      ctx.font = `bold 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(h.label, h.rect.x + h.rect.w / 2, h.rect.y + h.rect.h / 2);
+    }
+    for (const h of this.yHeaders) {
+      this.drawRoundRectStroke(h.rect.x, h.rect.y, h.rect.w, h.rect.h, HEADER_RADIUS, this.colors.headerYBg, this.colors.border, 1, false);
+      ctx.fillStyle = this.colors.text;
+      ctx.font = `bold 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      this.drawTruncatedText(h.label, h.rect.x + h.rect.w - HEADER_PAD, h.rect.y + h.rect.h / 2, h.rect.w - HEADER_PAD * 2);
+    }
+    for (const card of this.cards) {
+      if (card.isRange)
+        continue;
+      if (((_b = this.dragState) == null ? void 0 : _b.dragging) && this.dragState.card === card)
+        continue;
+      this.drawCard(card);
+    }
+    for (const card of this.cards) {
+      if (!card.isRange)
+        continue;
+      this.drawCard(card);
+      if (this.hoveredCard === card && card.rangeLayout) {
+        this.drawResizeHandles(card);
+      }
+    }
+    if ((_c = this.dragState) == null ? void 0 : _c.dragging) {
+      ctx.save();
+      ctx.globalAlpha = 0.6;
+      const dx = this.dragState.currentX - this.dragState.startX;
+      const dy = this.dragState.currentY - this.dragState.startY;
+      const card = this.dragState.card;
+      const ghostCard = {
+        ...card,
+        rect: {
+          x: card.rect.x + dx,
+          y: card.rect.y + dy,
+          w: card.rect.w,
+          h: card.rect.h
+        }
+      };
+      this.drawCard(ghostCard);
+      ctx.restore();
+    }
+  }
+  drawCard(card) {
+    const ctx = this.ctx;
+    const { x, y, w, h } = card.rect;
+    const isHovered = this.hoveredCard === card;
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.15)";
+    ctx.shadowBlur = isHovered ? 12 : 4;
+    ctx.shadowOffsetY = isHovered ? 4 : 2;
+    const bg = card.style.background || this.colors.cardBg;
+    this.drawRoundRect(x, y, w, h, CARD_RADIUS, bg);
+    ctx.restore();
+    if (card.style.border) {
+      ctx.strokeStyle = card.style.border;
+      ctx.lineWidth = 2;
+      this.strokeRoundRect(x, y, w, h, CARD_RADIUS);
+    }
+    ctx.save();
+    this.traceRoundRect(x, y, w, h, CARD_RADIUS);
+    ctx.clip();
+    if (card.isVertical) {
+      ctx.fillStyle = card.colorBarColor;
+      ctx.fillRect(x, y, w, 4);
+    } else {
+      ctx.fillStyle = card.colorBarColor;
+      ctx.fillRect(x, y, COLOR_BAR_W, h);
+    }
+    const textColor = card.style.textColor || this.colors.text;
+    ctx.fillStyle = isHovered ? this.colors.accent : textColor;
+    ctx.font = CARD_FONT;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    const textX = x + COLOR_BAR_W + 8;
+    const textMaxW = w - COLOR_BAR_W - 16;
+    const textY = y + CARD_PAD_V + (card.isVertical ? 4 : 0);
+    const lines = card.textLines;
+    for (let i = 0; i < lines.length; i++) {
+      this.drawTruncatedText(lines[i], textX, textY + i * LINE_HEIGHT, textMaxW);
+    }
+    ctx.restore();
+  }
+  drawResizeHandles(card) {
+    const ctx = this.ctx;
+    const rl = card.rangeLayout;
+    ctx.fillStyle = this.colors.accent;
+    ctx.globalAlpha = 0.6;
+    if (rl.hasXRange && !this.config.xReadonly) {
+      this.drawRoundRectPartial(card.rect.x, card.rect.y, HANDLE_SIZE, card.rect.h, CARD_RADIUS, true, false, false, true);
+      this.drawRoundRectPartial(card.rect.x + card.rect.w - HANDLE_SIZE, card.rect.y, HANDLE_SIZE, card.rect.h, CARD_RADIUS, false, true, true, false);
+    }
+    if (rl.hasYRange && !this.config.yReadonly) {
+      this.drawRoundRectPartial(card.rect.x, card.rect.y, card.rect.w, HANDLE_SIZE, CARD_RADIUS, true, true, false, false);
+      this.drawRoundRectPartial(card.rect.x, card.rect.y + card.rect.h - HANDLE_SIZE, card.rect.w, HANDLE_SIZE, CARD_RADIUS, false, false, true, true);
+    }
+    ctx.globalAlpha = 1;
+  }
+  // ── Drawing Helpers ──────────────────────────────────────────────
+  traceRoundRect(x, y, w, h, r) {
+    const ctx = this.ctx;
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.arcTo(x + w, y, x + w, y + r, r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+    ctx.lineTo(x + r, y + h);
+    ctx.arcTo(x, y + h, x, y + h - r, r);
+    ctx.lineTo(x, y + r);
+    ctx.arcTo(x, y, x + r, y, r);
+    ctx.closePath();
+  }
+  drawRoundRect(x, y, w, h, r, fillColor) {
+    this.traceRoundRect(x, y, w, h, r);
+    this.ctx.fillStyle = fillColor;
+    this.ctx.fill();
+  }
+  strokeRoundRect(x, y, w, h, r) {
+    this.traceRoundRect(x, y, w, h, r);
+    this.ctx.stroke();
+  }
+  drawRoundRectStroke(x, y, w, h, r, fillColor, strokeColor, lineWidth, dashed) {
+    this.traceRoundRect(x, y, w, h, r);
+    const ctx = this.ctx;
+    ctx.fillStyle = fillColor;
+    ctx.fill();
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = lineWidth;
+    if (dashed)
+      ctx.setLineDash([4, 4]);
+    ctx.stroke();
+    if (dashed)
+      ctx.setLineDash([]);
+  }
+  drawRoundRectPartial(x, y, w, h, r, tl, tr, br, bl) {
+    const ctx = this.ctx;
+    const rtl = tl ? r : 0;
+    const rtr = tr ? r : 0;
+    const rbr = br ? r : 0;
+    const rbl = bl ? r : 0;
+    ctx.beginPath();
+    ctx.moveTo(x + rtl, y);
+    ctx.lineTo(x + w - rtr, y);
+    if (rtr)
+      ctx.arcTo(x + w, y, x + w, y + rtr, rtr);
+    else
+      ctx.lineTo(x + w, y);
+    ctx.lineTo(x + w, y + h - rbr);
+    if (rbr)
+      ctx.arcTo(x + w, y + h, x + w - rbr, y + h, rbr);
+    else
+      ctx.lineTo(x + w, y + h);
+    ctx.lineTo(x + rbl, y + h);
+    if (rbl)
+      ctx.arcTo(x, y + h, x, y + h - rbl, rbl);
+    else
+      ctx.lineTo(x, y + h);
+    ctx.lineTo(x, y + rtl);
+    if (rtl)
+      ctx.arcTo(x, y, x + rtl, y, rtl);
+    else
+      ctx.lineTo(x, y);
+    ctx.closePath();
+    ctx.fill();
+  }
+  drawTruncatedText(text, x, y, maxWidth) {
+    const ctx = this.ctx;
+    if (maxWidth <= 0)
+      return;
+    if (ctx.measureText(text).width <= maxWidth) {
+      ctx.fillText(text, x, y);
+      return;
+    }
+    const ellipsis = "\u2026";
+    let truncated = text;
+    while (truncated.length > 0 && ctx.measureText(truncated + ellipsis).width > maxWidth) {
+      truncated = truncated.slice(0, -1);
+    }
+    ctx.fillText(truncated + ellipsis, x, y);
+  }
+  // ── Hit Testing ──────────────────────────────────────────────────
+  canvasToLayout(clientX, clientY) {
+    const rect = this.canvas.getBoundingClientRect();
+    const scale = this.zoomLevel / 100;
+    return {
+      x: (clientX - rect.left) / scale,
+      y: (clientY - rect.top) / scale
+    };
+  }
+  hitTest(lx, ly) {
+    for (const card of this.cards) {
+      if (!card.isRange || !card.rangeLayout)
+        continue;
+      const rl = card.rangeLayout;
+      const r = card.rect;
+      if (rl.hasXRange && !this.config.xReadonly) {
+        if (lx >= r.x && lx <= r.x + HANDLE_SIZE && ly >= r.y && ly <= r.y + r.h) {
+          return { type: "handle", edge: "start", axis: "x", card };
+        }
+        if (lx >= r.x + r.w - HANDLE_SIZE && lx <= r.x + r.w && ly >= r.y && ly <= r.y + r.h) {
+          return { type: "handle", edge: "end", axis: "x", card };
+        }
+      }
+      if (rl.hasYRange && !this.config.yReadonly) {
+        if (lx >= r.x && lx <= r.x + r.w && ly >= r.y && ly <= r.y + HANDLE_SIZE) {
+          return { type: "handle", edge: "start", axis: "y", card };
+        }
+        if (lx >= r.x && lx <= r.x + r.w && ly >= r.y + r.h - HANDLE_SIZE && ly <= r.y + r.h) {
+          return { type: "handle", edge: "end", axis: "y", card };
+        }
+      }
+    }
+    for (let i = this.cards.length - 1; i >= 0; i--) {
+      const card = this.cards[i];
+      if (this.pointInRect(lx, ly, card.rect)) {
+        return { type: "card", card };
+      }
+    }
+    for (const cell of this.cells) {
+      if (this.pointInRect(lx, ly, cell.rect)) {
+        return { type: "cell", cell };
+      }
+    }
+    return null;
+  }
+  pointInRect(x, y, rect) {
+    return x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h;
+  }
+  findCellAt(lx, ly) {
+    for (const cell of this.cells) {
+      if (this.pointInRect(lx, ly, cell.rect))
+        return cell;
+    }
+    return null;
+  }
+  // ── Event Listeners ──────────────────────────────────────────────
+  setupEventListeners() {
+    this.canvas.addEventListener("mousedown", this.onMouseDown);
+    this.canvas.addEventListener("mousemove", this.onMouseMove);
+    this.canvas.addEventListener("mouseup", this.onMouseUp);
+    this.canvas.addEventListener("mouseleave", this.onMouseLeave);
+    this.canvas.addEventListener("wheel", this.onWheel, { passive: false });
+  }
+  findClosestCellByPos(lx, ly, axis) {
+    let bestIdx = -1;
+    let bestDist = Infinity;
+    const uniqueIndices = /* @__PURE__ */ new Set();
+    for (const cell of this.cells) {
+      const idx = axis === "x" ? cell.xIdx : cell.yIdx;
+      if (idx < 0 || uniqueIndices.has(idx))
+        continue;
+      uniqueIndices.add(idx);
+      const mid = axis === "x" ? cell.rect.x + cell.rect.w / 2 : cell.rect.y + cell.rect.h / 2;
+      const mousePos = axis === "x" ? lx : ly;
+      const dist = Math.abs(mousePos - mid);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestIdx = idx;
+      }
+    }
+    return bestIdx;
+  }
+  // ── Drop Logic ───────────────────────────────────────────────────
+  async executeDrop(doc, cell) {
+    try {
+      const updates = {};
+      if (this.config.xAxis && cell.xVal !== void 0 && !this.config.xReadonly) {
+        if (this.config.xExact) {
+          const exactVal = await this.promptExactValue(this.config.xAxis, cell.xVal, this.xValues);
+          if (exactVal === null)
+            return;
+          updates[this.config.xAxis] = exactVal;
+        } else {
+          const xWriteValue = await this.resolveDropValue(
+            cell.xVal,
+            this.xTransformFn,
+            this.xReverseMap,
+            this.config.xAxis
+          );
+          if (xWriteValue === null)
+            return;
+          updates[this.config.xAxis] = xWriteValue;
+        }
+      }
+      if (this.config.yAxis && cell.yVal !== void 0 && !this.config.yReadonly) {
+        if (this.config.yExact) {
+          const exactVal = await this.promptExactValue(this.config.yAxis, cell.yVal, this.yValues);
+          if (exactVal === null)
+            return;
+          updates[this.config.yAxis] = exactVal;
+        } else {
+          const yWriteValue = await this.resolveDropValue(
+            cell.yVal,
+            this.yTransformFn,
+            this.yReverseMap,
+            this.config.yAxis
+          );
+          if (yWriteValue === null)
+            return;
+          updates[this.config.yAxis] = yWriteValue;
+        }
+      }
+      if (Object.keys(updates).length === 0)
+        return;
+      await this.updater.updateProperties(doc.file, updates);
+      this.refreshOnCacheUpdate(doc.file);
+    } catch (error) {
+      console.error("Failed to update document position:", error);
+    }
+  }
+  resolveDropValue(cellDisplayValue, transformFn, reverseMap, axisName) {
+    return new Promise((resolve) => {
+      if (!transformFn) {
+        resolve(cellDisplayValue);
+        return;
+      }
+      const candidates = (reverseMap == null ? void 0 : reverseMap.get(String(cellDisplayValue))) || [];
+      const modal = new ValuePickerModal(
+        this.app,
+        axisName,
+        String(cellDisplayValue),
+        candidates,
+        transformFn,
+        (chosenValue) => resolve(chosenValue)
+      );
+      modal.open();
+    });
+  }
+  promptExactValue(axisName, cellValue, allCellValues) {
+    return new Promise((resolve) => {
+      const [rangeMin, rangeMax] = getCellRange(cellValue, allCellValues);
+      const modal = new ExactValueModal(
+        this.app,
+        axisName,
+        parseFloat(String(cellValue)),
+        rangeMin,
+        rangeMax,
+        (value) => resolve(value)
+      );
+      modal.open();
+    });
+  }
+  refreshOnCacheUpdate(file) {
+    const maxWait = 2e3;
+    const handler = (changedFile) => {
+      if (changedFile.path === file.path) {
+        cleanup();
+        this.onRefresh();
+      }
+    };
+    const timeout = setTimeout(() => {
+      cleanup();
+      this.onRefresh();
+    }, maxWait);
+    const cleanup = () => {
+      this.app.metadataCache.off("changed", handler);
+      clearTimeout(timeout);
+    };
+    this.app.metadataCache.on("changed", handler);
+  }
+  // ── Preview ──────────────────────────────────────────────────────
+  schedulePreview(doc, event) {
+    this.hidePreview();
+    this.previewTimeout = setTimeout(async () => {
+      await this.showPreview(doc, event);
+    }, 300);
+  }
+  async showPreview(doc, event) {
+    this.hidePreview();
+    this.previewEl = document.body.createDiv({ cls: "hermione-preview" });
+    const header = this.previewEl.createDiv({ cls: "hermione-preview-header" });
+    header.createSpan({ text: doc.name, cls: "hermione-preview-title" });
+    const content = this.previewEl.createDiv({ cls: "hermione-preview-content" });
+    const mode = this.config.preview || "document";
+    switch (mode) {
+      case "axes":
+        this.showPreviewAxes(content, doc);
+        break;
+      case "properties":
+        this.showPreviewProperties(content, doc);
+        break;
+      default:
+        await this.showPreviewDocument(content, doc);
+        break;
+    }
+    this.positionPreview(event);
+  }
+  async showPreviewDocument(content, doc) {
+    try {
+      const fileContent = await this.app.vault.read(doc.file);
+      const contentWithoutFrontmatter = fileContent.replace(/^---[\s\S]*?---\n?/, "");
+      const previewContent = contentWithoutFrontmatter.slice(0, 1e3);
+      const truncated = contentWithoutFrontmatter.length > 1e3;
+      await import_obsidian5.MarkdownRenderer.render(
+        this.app,
+        previewContent + (truncated ? "\n\n*...*" : ""),
+        content,
+        doc.path,
+        new import_obsidian5.Component()
+      );
+    } catch (e) {
+      content.createSpan({ text: "Vorschau nicht verf\xFCgbar", cls: "hermione-preview-error" });
+    }
+  }
+  showPreviewAxes(content, doc) {
+    const list = content.createDiv({ cls: "hermione-preview-props" });
+    if (this.config.xAxis) {
+      const label = this.config.xLabel || this.config.xAxis;
+      const value = getPropertyValue(doc.properties, this.config.xAxis);
+      this.renderPreviewProp(list, label, value);
+    }
+    if (this.config.yAxis) {
+      const label = this.config.yLabel || this.config.yAxis;
+      const value = getPropertyValue(doc.properties, this.config.yAxis);
+      this.renderPreviewProp(list, label, value);
+    }
+  }
+  showPreviewProperties(content, doc) {
+    const list = content.createDiv({ cls: "hermione-preview-props" });
+    const skipKeys = /* @__PURE__ */ new Set(["position", "file.name", "file.path", "file.ctime", "file.mtime", "file.size", "file.tags"]);
+    for (const [key, value] of Object.entries(doc.properties)) {
+      if (skipKeys.has(key) || key.startsWith("file."))
+        continue;
+      if (typeof value === "object" && value !== null && !Array.isArray(value) && "start" in value && "end" in value)
+        continue;
+      this.renderPreviewProp(list, key, value);
+    }
+  }
+  renderPreviewProp(container, key, value) {
+    const row = container.createDiv({ cls: "hermione-preview-prop" });
+    row.createSpan({ cls: "hermione-preview-prop-key", text: key });
+    row.createSpan({ cls: "hermione-preview-prop-value", text: formatDisplayValue(value) });
+  }
+  positionPreview(event) {
+    if (!this.previewEl)
+      return;
+    const padding = 15;
+    const maxWidth = 400;
+    const maxHeight = 300;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let left = event.clientX + padding;
+    let top = event.clientY + padding;
+    if (left + maxWidth > vw)
+      left = event.clientX - maxWidth - padding;
+    if (top + maxHeight > vh)
+      top = event.clientY - maxHeight - padding;
+    left = Math.max(padding, left);
+    top = Math.max(padding, top);
+    this.previewEl.style.left = `${left}px`;
+    this.previewEl.style.top = `${top}px`;
+  }
+  hidePreview() {
+    if (this.previewTimeout) {
+      clearTimeout(this.previewTimeout);
+      this.previewTimeout = null;
+    }
+    if (this.previewEl) {
+      this.previewEl.remove();
+      this.previewEl = null;
+    }
+  }
+  // ── Unassigned Documents ─────────────────────────────────────────
+  renderUnassigned() {
+    if (this.config.hideUnassigned)
+      return;
+    const hasX = this.config.xAxis && this.xValues.length > 0;
+    const hasY = this.config.yAxis && this.yValues.length > 0;
+    const unassigned = this.result.documents.filter((doc) => {
+      if (hasX) {
+        const rawX = getPropertyValue(doc.properties, this.config.xAxis);
+        if (rawX === void 0 || rawX === null || rawX === "")
+          return true;
+        const xMatches = this.xValues.some(
+          (xVal) => Array.isArray(rawX) ? rawX.some((v) => matchesCellValue(v, xVal, this.xTransformFn, !!this.config.xExact, this.xValues)) : matchesCellValue(rawX, xVal, this.xTransformFn, !!this.config.xExact, this.xValues)
+        );
+        if (!xMatches)
+          return true;
+      }
+      if (hasY) {
+        const rawY = getPropertyValue(doc.properties, this.config.yAxis);
+        if (rawY === void 0 || rawY === null || rawY === "")
+          return true;
+        const yMatches = this.yValues.some(
+          (yVal) => Array.isArray(rawY) ? rawY.some((v) => matchesCellValue(v, yVal, this.yTransformFn, !!this.config.yExact, this.yValues)) : matchesCellValue(rawY, yVal, this.yTransformFn, !!this.config.yExact, this.yValues)
+        );
+        if (!yMatches)
+          return true;
+      }
+      return false;
+    });
+    if (unassigned.length === 0)
+      return;
+    const section = this.containerEl.createDiv({ cls: "hermione-unassigned" });
+    section.createEl("strong", { text: "Nicht zugeordnet:" });
+    const items = section.createDiv({ cls: "hermione-unassigned-items" });
+    for (const doc of unassigned) {
+      const card = items.createDiv({ cls: "hermione-card" });
+      const style = evaluateCardStyle(doc, this.cardStyleFn);
+      const colorBar = card.createDiv({ cls: "hermione-card-color" });
+      colorBar.style.backgroundColor = style.color || getDocumentColor(doc.name);
+      if (style.background)
+        card.style.backgroundColor = style.background;
+      const content = card.createDiv({ cls: "hermione-card-content" });
+      const titleSpan = content.createSpan({ cls: "hermione-card-title", text: doc.name });
+      if (style.textColor)
+        titleSpan.style.color = style.textColor;
+      card.addEventListener("click", () => this.app.workspace.openLinkText(doc.path, ""));
+      card.style.cursor = "pointer";
+    }
+  }
+  // ── Toolbar ──────────────────────────────────────────────────────
+  renderToolbar() {
+    const toolbar = this.containerEl.createDiv({ cls: "hermione-toolbar" });
+    const zoomControls = toolbar.createDiv({ cls: "hermione-zoom-controls" });
+    const zoomOutBtn = zoomControls.createEl("button", { cls: "hermione-zoom-btn" });
+    (0, import_obsidian5.setIcon)(zoomOutBtn, "minus");
+    zoomOutBtn.title = "Verkleinern";
+    zoomOutBtn.addEventListener("click", () => {
+      if (this.zoomLevel > ZOOM_MIN) {
+        this.zoomLevel -= ZOOM_STEP;
+        this.applyCanvasSize();
+        this.draw();
+        this.updateZoomDisplay();
+      }
+    });
+    this.zoomDisplay = zoomControls.createEl("button", {
+      cls: "hermione-zoom-display",
+      text: `${this.zoomLevel}%`
+    });
+    this.zoomDisplay.title = "Zoom zur\xFCcksetzen";
+    this.zoomDisplay.addEventListener("click", () => {
+      this.zoomLevel = 100;
+      this.applyCanvasSize();
+      this.draw();
+      this.updateZoomDisplay();
+    });
+    const zoomInBtn = zoomControls.createEl("button", { cls: "hermione-zoom-btn" });
+    (0, import_obsidian5.setIcon)(zoomInBtn, "plus");
+    zoomInBtn.title = "Vergr\xF6\xDFern";
+    zoomInBtn.addEventListener("click", () => {
+      if (this.zoomLevel < ZOOM_MAX) {
+        this.zoomLevel += ZOOM_STEP;
+        this.applyCanvasSize();
+        this.draw();
+        this.updateZoomDisplay();
+      }
+    });
+    const slider = zoomControls.createEl("input", { cls: "hermione-zoom-slider", type: "range" });
+    slider.min = String(ZOOM_MIN);
+    slider.max = String(ZOOM_MAX);
+    slider.step = String(ZOOM_STEP);
+    slider.value = String(this.zoomLevel);
+    slider.title = "Zoom";
+    slider.addEventListener("input", (e) => {
+      this.zoomLevel = parseInt(e.target.value);
+      this.applyCanvasSize();
+      this.draw();
+      this.updateZoomDisplay();
+    });
+    const refreshBtn = toolbar.createEl("button", { cls: "hermione-refresh-btn", text: "Aktualisieren" });
+    (0, import_obsidian5.setIcon)(refreshBtn, "refresh-cw");
+    refreshBtn.addEventListener("click", () => this.onRefresh());
+  }
+  updateZoomDisplay() {
+    if (this.zoomDisplay)
+      this.zoomDisplay.textContent = `${this.zoomLevel}%`;
+    const slider = this.containerEl.querySelector(".hermione-zoom-slider");
+    if (slider)
+      slider.value = String(this.zoomLevel);
+  }
+};
+
 // src/main.ts
 var DEFAULT_SETTINGS = {
   refreshOnChange: true,
   defaultSort: "asc"
 };
-var HermionePlugin = class extends import_obsidian5.Plugin {
+var HermionePlugin = class extends import_obsidian6.Plugin {
   async onload() {
     await this.loadSettings();
     this.queryEngine = new QueryEngine(this.app);
@@ -2469,13 +4157,14 @@ var HermionePlugin = class extends import_obsidian5.Plugin {
         };
       }
       const result = await this.queryEngine.execute(config);
+      const RendererClass = config.renderer === "canvas" ? CanvasRenderer : MatrixRenderer;
       const refresh = async () => {
         const newResult = await this.queryEngine.execute(config);
         el.empty();
-        const renderer2 = new MatrixRenderer(el, this.app, config, newResult, refresh);
+        const renderer2 = new RendererClass(el, this.app, config, newResult, refresh);
         ctx.addChild(renderer2);
       };
-      const renderer = new MatrixRenderer(el, this.app, config, result, refresh);
+      const renderer = new RendererClass(el, this.app, config, result, refresh);
       ctx.addChild(renderer);
     } catch (error) {
       el.createDiv({
@@ -2485,7 +4174,7 @@ var HermionePlugin = class extends import_obsidian5.Plugin {
     }
   }
 };
-var HermioneSettingTab = class extends import_obsidian5.PluginSettingTab {
+var HermioneSettingTab = class extends import_obsidian6.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -2494,11 +4183,11 @@ var HermioneSettingTab = class extends import_obsidian5.PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     containerEl.createEl("h2", { text: "Hermione Einstellungen" });
-    new import_obsidian5.Setting(containerEl).setName("Automatisch aktualisieren").setDesc("Aktualisiert die Ansicht automatisch, wenn Dokumente ge\xE4ndert werden").addToggle((toggle) => toggle.setValue(this.plugin.settings.refreshOnChange).onChange(async (value) => {
+    new import_obsidian6.Setting(containerEl).setName("Automatisch aktualisieren").setDesc("Aktualisiert die Ansicht automatisch, wenn Dokumente ge\xE4ndert werden").addToggle((toggle) => toggle.setValue(this.plugin.settings.refreshOnChange).onChange(async (value) => {
       this.plugin.settings.refreshOnChange = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian5.Setting(containerEl).setName("Standard-Sortierung").setDesc("Standard-Sortierrichtung f\xFCr Abfragen").addDropdown((dropdown) => dropdown.addOption("asc", "Aufsteigend").addOption("desc", "Absteigend").setValue(this.plugin.settings.defaultSort).onChange(async (value) => {
+    new import_obsidian6.Setting(containerEl).setName("Standard-Sortierung").setDesc("Standard-Sortierrichtung f\xFCr Abfragen").addDropdown((dropdown) => dropdown.addOption("asc", "Aufsteigend").addOption("desc", "Absteigend").setValue(this.plugin.settings.defaultSort).onChange(async (value) => {
       this.plugin.settings.defaultSort = value;
       await this.plugin.saveSettings();
     }));

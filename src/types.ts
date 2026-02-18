@@ -57,6 +57,8 @@ export interface HermioneConfig {
   xAxisEnd?: string;
   /** End property for Y-axis range (Von...Bis). Creates cards spanning multiple rows. */
   yAxisEnd?: string;
+  /** Rendering mode: "html" (default DOM/CSS Grid) or "canvas" (Canvas-based) */
+  renderer?: "html" | "canvas";
 }
 
 /**

@@ -253,6 +253,11 @@ export function parseHermioneBlock(content: string): HermioneConfig {
       case "yend":
         config.yAxisEnd = value;
         break;
+      case "renderer":
+      case "darstellung":
+      case "rendering":
+        config.renderer = value.toLowerCase() === "canvas" ? "canvas" : "html";
+        break;
       case "preview":
       case "vorschau":
       case "tooltip":

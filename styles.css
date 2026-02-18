@@ -1330,6 +1330,38 @@
   border-radius: 8px;
 }
 
+/* ==========================================
+   CANVAS RENDERER
+   ========================================== */
+
+.hermione-canvas-wrapper {
+  display: flex;
+  align-items: stretch;
+}
+
+.hermione-canvas-container {
+  overflow: auto;
+  padding: 8px;
+  flex: 1;
+}
+
+.hermione-canvas {
+  display: block;
+}
+
+.hermione-canvas-xlabel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 0 2px;
+}
+
+.hermione-canvas-xlabel span {
+  font-weight: var(--font-semibold);
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .hermione-table,
