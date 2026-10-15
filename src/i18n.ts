@@ -85,6 +85,7 @@ export interface Strings {
     valuesRequired: string;
     unknownValue: (raw: string) => string;
     notInList: (count: number, prop: string) => string;
+    unassigned: (prop: string) => string;
     xAxisRequired: string;
     newDocBaseName: string;
     created: (name: string) => string;
@@ -174,6 +175,7 @@ const de: Strings = {
     invalidSteps: (raw) => `Schritte müssen eine ganze Zahl ≥ 1 sein, erhalten: "${raw}"`,
     unknownScale: (raw) => `Unbekannte Skala: "${raw}" (erlaubt: direkt, liste)`,
     valuesRequired: "Eine Listen-Skala benötigt mindestens zwei Werte (werte)",
+    unassigned: (prop) => `Ohne Wert in "${prop}" – auf die Skala ziehen, um einen Wert zu setzen`,
     unknownValue: (raw) => `Wert "${raw}" kommt in der Skala nicht vor`,
     notInList: (count, prop) =>
       `${count} ${count === 1 ? "Dokument hat" : "Dokumente haben"} in "${prop}" einen Wert, der nicht in der Skala vorkommt`,
@@ -268,6 +270,7 @@ const en: Strings = {
     invalidSteps: (raw) => `Steps must be an integer ≥ 1, got: "${raw}"`,
     unknownScale: (raw) => `Unknown scale: "${raw}" (allowed: direct, list)`,
     valuesRequired: "A list scale requires at least two values (values)",
+    unassigned: (prop) => `No value in "${prop}" – drag onto the scale to set one`,
     unknownValue: (raw) => `Value "${raw}" is not part of the scale`,
     notInList: (count, prop) =>
       `${count} ${count === 1 ? "document has" : "documents have"} a value in "${prop}" that is not part of the scale`,

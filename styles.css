@@ -1632,7 +1632,7 @@
 }
 
 .hermione-topic-docs-info {
-  grid-row: 5;
+  grid-row: 6;
   margin-top: 4px;
   font-size: var(--font-ui-smaller);
   color: var(--text-faint);
@@ -1664,4 +1664,37 @@
   color: var(--text-normal);
   white-space: nowrap;
   pointer-events: none;
+}
+
+/* Documents without the scale property, at the foot of the view */
+.hermione-topic-unassigned {
+  grid-column: 1;
+  grid-row: 5;
+  margin: 10px var(--hermione-topic-inset) 0;
+  padding-top: 6px;
+  border-top: 1px dashed var(--background-modifier-border);
+}
+
+.hermione-topic-unassigned-title {
+  margin-bottom: 4px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.hermione-topic-unassigned-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* Flow layout instead of absolute positioning on the scale */
+.hermione-topic-doc.is-unassigned {
+  position: relative;
+  flex: none;
+  transform: none;
+  opacity: 0.7;
+}
+
+.hermione-topic-doc.is-unassigned.is-dragging {
+  opacity: 1;
 }

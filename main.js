@@ -109,6 +109,7 @@ var de = {
     invalidSteps: (raw) => `Schritte m\xFCssen eine ganze Zahl \u2265 1 sein, erhalten: "${raw}"`,
     unknownScale: (raw) => `Unbekannte Skala: "${raw}" (erlaubt: direkt, liste)`,
     valuesRequired: "Eine Listen-Skala ben\xF6tigt mindestens zwei Werte (werte)",
+    unassigned: (prop) => `Ohne Wert in "${prop}" \u2013 auf die Skala ziehen, um einen Wert zu setzen`,
     unknownValue: (raw) => `Wert "${raw}" kommt in der Skala nicht vor`,
     notInList: (count, prop) => `${count} ${count === 1 ? "Dokument hat" : "Dokumente haben"} in "${prop}" einen Wert, der nicht in der Skala vorkommt`,
     xAxisRequired: "Mit source muss auch x-achse (Eigenschaft der Dokumente) angegeben werden",
@@ -199,6 +200,7 @@ var en = {
     invalidSteps: (raw) => `Steps must be an integer \u2265 1, got: "${raw}"`,
     unknownScale: (raw) => `Unknown scale: "${raw}" (allowed: direct, list)`,
     valuesRequired: "A list scale requires at least two values (values)",
+    unassigned: (prop) => `No value in "${prop}" \u2013 drag onto the scale to set one`,
     unknownValue: (raw) => `Value "${raw}" is not part of the scale`,
     notInList: (count, prop) => `${count} ${count === 1 ? "document has" : "documents have"} a value in "${prop}" that is not part of the scale`,
     xAxisRequired: "When source is set, x-axis (document property) is required",
@@ -4786,6 +4788,7 @@ var TopicRenderer = class extends import_obsidian7.MarkdownRenderChild {
     if (config.source && config.xAxis) {
       this.setupDocuments(
         grid.createDiv({ cls: "hermione-topic-docs" }),
+        grid.createDiv({ cls: "hermione-topic-unassigned" }),
         grid.createDiv({ cls: "hermione-topic-docs-info" })
       );
     }
@@ -4807,23 +4810,27 @@ var TopicRenderer = class extends import_obsidian7.MarkdownRenderChild {
   }
   // ── Documents below the scale ────────────────────────────────────
   /** Query documents, draw them and keep them up to date */
-  setupDocuments(dotsEl, infoEl) {
+  setupDocuments(dotsEl, unassignedEl, infoEl) {
     const engine = new QueryEngine(this.app);
     const styleFn = this.config.cardStyle ? compileTransform(this.config.cardStyle) : null;
     let docs = [];
+    let unassigned = [];
     const load = async () => {
       const { min, max, source, xAxis, values } = this.config;
       let notNumeric = 0;
       let notInList = 0;
       let outOfRange = 0;
       docs = [];
+      unassigned = [];
       for (const file of engine.getSourceFiles(source)) {
         const doc = await engine.getDocumentData(file);
         if (!doc)
           continue;
         const raw = engine.getPropertyValue(doc.properties, xAxis);
-        if (raw === void 0 || raw === null || raw === "")
+        if (raw === void 0 || raw === null || raw === "") {
+          unassigned.push({ doc, style: evaluateDotStyle(doc, styleFn) });
           continue;
+        }
         if (values) {
           const index = indexInList(values, raw);
           if (index === -1) {
@@ -4858,6 +4865,7 @@ var TopicRenderer = class extends import_obsidian7.MarkdownRenderChild {
         return;
       }
       this.layoutDocuments(dotsEl, docs);
+      this.layoutUnassigned(unassignedEl, dotsEl, unassigned);
     };
     const observer = new ResizeObserver((0, import_obsidian7.debounce)(layout, 50, true));
     observer.observe(dotsEl);
@@ -4920,12 +4928,7 @@ var TopicRenderer = class extends import_obsidian7.MarkdownRenderChild {
     let moved = false;
     let current = original;
     let badge = null;
-    const valueAt = (clientX) => {
-      const rect = dotsEl.getBoundingClientRect();
-      const fraction = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-      const raw = min + fraction * (max - min);
-      return this.config.exact ? this.roundExact(raw) : this.snap(raw);
-    };
+    const valueAt = (clientX) => this.valueAt(clientX, dotsEl);
     dot.addEventListener("pointerdown", (evt) => {
       if (evt.button !== 0)
         return;
@@ -4969,6 +4972,103 @@ var TopicRenderer = class extends import_obsidian7.MarkdownRenderChild {
         });
       } else {
         dot.style.left = `${(original - min) / (max - min) * 100}%`;
+      }
+      const pending = this.pendingLayout;
+      this.pendingLayout = null;
+      pending == null ? void 0 : pending();
+    };
+    dot.addEventListener("pointerup", (evt) => void finish(evt, false));
+    dot.addEventListener("pointercancel", (evt) => void finish(evt, true));
+  }
+  /** Scale position under clientX, snapped (or rounded for `exakt`) and clamped */
+  valueAt(clientX, dotsEl) {
+    const { min, max } = this.config;
+    const rect = dotsEl.getBoundingClientRect();
+    const fraction = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    const raw = min + fraction * (max - min);
+    return this.config.exact ? this.roundExact(raw) : this.snap(raw);
+  }
+  /** Draw documents without the scale property as a row of circles at the foot */
+  layoutUnassigned(unassignedEl, dotsEl, docs) {
+    unassignedEl.empty();
+    unassignedEl.toggle(docs.length > 0);
+    if (!docs.length)
+      return;
+    unassignedEl.createDiv({ cls: "hermione-topic-unassigned-title", text: t().topic.unassigned(this.config.xAxis) });
+    const row = unassignedEl.createDiv({ cls: "hermione-topic-unassigned-dots" });
+    for (const { doc, style } of [...docs].sort((a, b) => a.doc.name.localeCompare(b.doc.name))) {
+      const dot = row.createDiv({ cls: "hermione-topic-doc is-unassigned" });
+      if (style.size) {
+        dot.style.width = `${style.size}px`;
+        dot.style.height = `${style.size}px`;
+      }
+      if (style.color)
+        dot.style.backgroundColor = style.color;
+      if (style.border)
+        dot.style.boxShadow = `inset 0 0 0 2px ${style.border}`;
+      (0, import_obsidian7.setTooltip)(dot, doc.name);
+      this.makeAssignable(dot, dotsEl, unassignedEl, doc);
+    }
+  }
+  /**
+   * Drag a circle from the foot onto the scale to give the document a value.
+   * The circle follows the pointer freely; it is assigned only when released
+   * above the foot area, using the scale position under the pointer.
+   * A click without movement opens the document.
+   */
+  makeAssignable(dot, dotsEl, footEl, doc) {
+    let startX = 0;
+    let startY = 0;
+    let moved = false;
+    let target = null;
+    let badge = null;
+    dot.addEventListener("pointerdown", (evt) => {
+      if (evt.button !== 0)
+        return;
+      evt.preventDefault();
+      dot.setPointerCapture(evt.pointerId);
+      startX = evt.clientX;
+      startY = evt.clientY;
+      moved = false;
+      target = null;
+    });
+    dot.addEventListener("pointermove", (evt) => {
+      if (!dot.hasPointerCapture(evt.pointerId))
+        return;
+      const dx = evt.clientX - startX;
+      const dy = evt.clientY - startY;
+      if (!moved && Math.hypot(dx, dy) < DRAG_THRESHOLD2)
+        return;
+      if (!moved) {
+        moved = true;
+        this.dragging = true;
+        dot.addClass("is-dragging");
+        badge = dot.createSpan({ cls: "hermione-topic-doc-badge" });
+      }
+      dot.style.transform = `translate(${dx}px, ${dy}px)`;
+      target = evt.clientY < footEl.getBoundingClientRect().top ? this.valueAt(evt.clientX, dotsEl) : null;
+      badge.setText(target === null ? "\u2013" : this.label(target));
+    });
+    const finish = async (evt, cancelled) => {
+      if (dot.hasPointerCapture(evt.pointerId))
+        dot.releasePointerCapture(evt.pointerId);
+      if (!moved) {
+        if (!cancelled) {
+          this.app.workspace.openLinkText(doc.path, this.ctx.sourcePath, evt.ctrlKey || evt.metaKey);
+        }
+        return;
+      }
+      dot.removeClass("is-dragging");
+      badge == null ? void 0 : badge.remove();
+      badge = null;
+      this.dragging = false;
+      if (!cancelled && target !== null) {
+        const value = this.toStored(target);
+        await this.app.fileManager.processFrontMatter(doc.file, (fm) => {
+          fm[this.config.xAxis] = value;
+        });
+      } else {
+        dot.style.transform = "";
       }
       const pending = this.pendingLayout;
       this.pendingLayout = null;

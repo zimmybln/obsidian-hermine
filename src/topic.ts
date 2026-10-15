@@ -51,6 +51,12 @@ interface PlacedDoc {
   style: DotStyle;
 }
 
+/** Document without the scale property, shown at the foot of the view */
+interface UnassignedDoc {
+  doc: DocumentData;
+  style: DotStyle;
+}
+
 const VALUE_KEYS = ["wert", "value"];
 const CARD_STYLE_KEYS = ["card-style", "karten-stil", "cardstyle", "style", "stil"];
 
@@ -350,6 +356,7 @@ export class TopicRenderer extends MarkdownRenderChild {
     if (config.source && config.xAxis) {
       this.setupDocuments(
         grid.createDiv({ cls: "hermione-topic-docs" }),
+        grid.createDiv({ cls: "hermione-topic-unassigned" }),
         grid.createDiv({ cls: "hermione-topic-docs-info" })
       );
     }
@@ -376,10 +383,11 @@ export class TopicRenderer extends MarkdownRenderChild {
   // ── Documents below the scale ────────────────────────────────────
 
   /** Query documents, draw them and keep them up to date */
-  private setupDocuments(dotsEl: HTMLElement, infoEl: HTMLElement): void {
+  private setupDocuments(dotsEl: HTMLElement, unassignedEl: HTMLElement, infoEl: HTMLElement): void {
     const engine = new QueryEngine(this.app);
     const styleFn = this.config.cardStyle ? compileTransform(this.config.cardStyle) : null;
     let docs: PlacedDoc[] = [];
+    let unassigned: UnassignedDoc[] = [];
 
     const load = async () => {
       const { min, max, source, xAxis, values } = this.config;
@@ -387,12 +395,16 @@ export class TopicRenderer extends MarkdownRenderChild {
       let notInList = 0;
       let outOfRange = 0;
       docs = [];
+      unassigned = [];
 
       for (const file of engine.getSourceFiles(source!)) {
         const doc = await engine.getDocumentData(file);
         if (!doc) continue;
         const raw = engine.getPropertyValue(doc.properties, xAxis!);
-        if (raw === undefined || raw === null || raw === "") continue;
+        if (raw === undefined || raw === null || raw === "") {
+          unassigned.push({ doc, style: evaluateDotStyle(doc, styleFn) });
+          continue;
+        }
         if (values) {
           // List scale: the property must be one of the list entries
           const index = indexInList(values, raw);
@@ -420,6 +432,7 @@ export class TopicRenderer extends MarkdownRenderChild {
         return;
       }
       this.layoutDocuments(dotsEl, docs);
+      this.layoutUnassigned(unassignedEl, dotsEl, unassigned);
     };
 
     // Row assignment depends on the pixel width, so re-layout on resize
@@ -490,12 +503,7 @@ export class TopicRenderer extends MarkdownRenderChild {
     let current = original;
     let badge: HTMLElement | null = null;
 
-    const valueAt = (clientX: number): number => {
-      const rect = dotsEl.getBoundingClientRect();
-      const fraction = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-      const raw = min + fraction * (max - min);
-      return this.config.exact ? this.roundExact(raw) : this.snap(raw);
-    };
+    const valueAt = (clientX: number) => this.valueAt(clientX, dotsEl);
 
     dot.addEventListener("pointerdown", (evt) => {
       if (evt.button !== 0) return;
@@ -545,6 +553,112 @@ export class TopicRenderer extends MarkdownRenderChild {
         });
       } else {
         dot.style.left = `${((original - min) / (max - min)) * 100}%`;
+      }
+
+      const pending = this.pendingLayout;
+      this.pendingLayout = null;
+      pending?.();
+    };
+
+    dot.addEventListener("pointerup", (evt) => void finish(evt, false));
+    dot.addEventListener("pointercancel", (evt) => void finish(evt, true));
+  }
+
+  /** Scale position under clientX, snapped (or rounded for `exakt`) and clamped */
+  private valueAt(clientX: number, dotsEl: HTMLElement): number {
+    const { min, max } = this.config;
+    const rect = dotsEl.getBoundingClientRect();
+    const fraction = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    const raw = min + fraction * (max - min);
+    return this.config.exact ? this.roundExact(raw) : this.snap(raw);
+  }
+
+  /** Draw documents without the scale property as a row of circles at the foot */
+  private layoutUnassigned(unassignedEl: HTMLElement, dotsEl: HTMLElement, docs: UnassignedDoc[]): void {
+    unassignedEl.empty();
+    unassignedEl.toggle(docs.length > 0);
+    if (!docs.length) return;
+
+    unassignedEl.createDiv({ cls: "hermione-topic-unassigned-title", text: t().topic.unassigned(this.config.xAxis!) });
+    const row = unassignedEl.createDiv({ cls: "hermione-topic-unassigned-dots" });
+
+    for (const { doc, style } of [...docs].sort((a, b) => a.doc.name.localeCompare(b.doc.name))) {
+      const dot = row.createDiv({ cls: "hermione-topic-doc is-unassigned" });
+      if (style.size) {
+        dot.style.width = `${style.size}px`;
+        dot.style.height = `${style.size}px`;
+      }
+      if (style.color) dot.style.backgroundColor = style.color;
+      if (style.border) dot.style.boxShadow = `inset 0 0 0 2px ${style.border}`;
+      setTooltip(dot, doc.name);
+      this.makeAssignable(dot, dotsEl, unassignedEl, doc);
+    }
+  }
+
+  /**
+   * Drag a circle from the foot onto the scale to give the document a value.
+   * The circle follows the pointer freely; it is assigned only when released
+   * above the foot area, using the scale position under the pointer.
+   * A click without movement opens the document.
+   */
+  private makeAssignable(dot: HTMLElement, dotsEl: HTMLElement, footEl: HTMLElement, doc: DocumentData): void {
+    let startX = 0;
+    let startY = 0;
+    let moved = false;
+    let target: number | null = null;
+    let badge: HTMLElement | null = null;
+
+    dot.addEventListener("pointerdown", (evt) => {
+      if (evt.button !== 0) return;
+      evt.preventDefault();
+      dot.setPointerCapture(evt.pointerId);
+      startX = evt.clientX;
+      startY = evt.clientY;
+      moved = false;
+      target = null;
+    });
+
+    dot.addEventListener("pointermove", (evt) => {
+      if (!dot.hasPointerCapture(evt.pointerId)) return;
+      const dx = evt.clientX - startX;
+      const dy = evt.clientY - startY;
+      if (!moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+
+      if (!moved) {
+        moved = true;
+        this.dragging = true;
+        dot.addClass("is-dragging");
+        badge = dot.createSpan({ cls: "hermione-topic-doc-badge" });
+      }
+
+      dot.style.transform = `translate(${dx}px, ${dy}px)`;
+      // Only a drop above the foot area assigns a value
+      target = evt.clientY < footEl.getBoundingClientRect().top ? this.valueAt(evt.clientX, dotsEl) : null;
+      badge!.setText(target === null ? "–" : this.label(target));
+    });
+
+    const finish = async (evt: PointerEvent, cancelled: boolean) => {
+      if (dot.hasPointerCapture(evt.pointerId)) dot.releasePointerCapture(evt.pointerId);
+
+      if (!moved) {
+        if (!cancelled) {
+          this.app.workspace.openLinkText(doc.path, this.ctx.sourcePath, evt.ctrlKey || evt.metaKey);
+        }
+        return;
+      }
+
+      dot.removeClass("is-dragging");
+      badge?.remove();
+      badge = null;
+      this.dragging = false;
+
+      if (!cancelled && target !== null) {
+        const value = this.toStored(target);
+        await this.app.fileManager.processFrontMatter(doc.file, (fm) => {
+          fm[this.config.xAxis!] = value;
+        });
+      } else {
+        dot.style.transform = "";
       }
 
       const pending = this.pendingLayout;
