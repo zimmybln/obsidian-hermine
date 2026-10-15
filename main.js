@@ -107,7 +107,10 @@ var de = {
     minGreaterMax: "Minimalwert muss kleiner als der Maximalwert sein",
     notANumber: (key, raw) => `"${key}" erwartet eine Zahl, erhalten: "${raw}"`,
     invalidSteps: (raw) => `Schritte m\xFCssen eine ganze Zahl \u2265 1 sein, erhalten: "${raw}"`,
-    unknownScale: (raw) => `Unbekannte Skala: "${raw}" (erlaubt: direkt)`,
+    unknownScale: (raw) => `Unbekannte Skala: "${raw}" (erlaubt: direkt, liste)`,
+    valuesRequired: "Eine Listen-Skala ben\xF6tigt mindestens zwei Werte (werte)",
+    unknownValue: (raw) => `Wert "${raw}" kommt in der Skala nicht vor`,
+    notInList: (count, prop) => `${count} ${count === 1 ? "Dokument hat" : "Dokumente haben"} in "${prop}" einen Wert, der nicht in der Skala vorkommt`,
     xAxisRequired: "Mit source muss auch x-achse (Eigenschaft der Dokumente) angegeben werden",
     newDocBaseName: "Dokument",
     created: (name) => `"${name}" erstellt`,
@@ -194,7 +197,10 @@ var en = {
     minGreaterMax: "Minimum must be less than maximum",
     notANumber: (key, raw) => `"${key}" expects a number, got: "${raw}"`,
     invalidSteps: (raw) => `Steps must be an integer \u2265 1, got: "${raw}"`,
-    unknownScale: (raw) => `Unknown scale: "${raw}" (allowed: direct)`,
+    unknownScale: (raw) => `Unknown scale: "${raw}" (allowed: direct, list)`,
+    valuesRequired: "A list scale requires at least two values (values)",
+    unknownValue: (raw) => `Value "${raw}" is not part of the scale`,
+    notInList: (count, prop) => `${count} ${count === 1 ? "document has" : "documents have"} a value in "${prop}" that is not part of the scale`,
     xAxisRequired: "When source is set, x-axis (document property) is required",
     newDocBaseName: "Document",
     created: (name) => `"${name}" created`,
@@ -4532,8 +4538,29 @@ function parseNumber(key, raw) {
     throw new Error(t().topic.notANumber(key, raw));
   return num;
 }
+function parseValueList(raw) {
+  var _a, _b;
+  const inner = raw.trim().replace(/^\[(.*)\]$/s, "$1");
+  const values = [];
+  const re = /\s*(?:"([^"]*)"|'([^']*)'|([^,]+))/g;
+  let match;
+  while ((match = re.exec(inner)) !== null) {
+    const v = ((_b = (_a = match[1]) != null ? _a : match[2]) != null ? _b : match[3]).trim();
+    if (v)
+      values.push(v);
+  }
+  return values;
+}
+function indexInList(values, raw) {
+  if (typeof raw !== "string" && typeof raw !== "number")
+    return -1;
+  const needle = String(raw).trim().toLowerCase();
+  return values.findIndex((v) => v.toLowerCase() === needle);
+}
 function parseTopicBlock(content) {
-  const config = { scale: "direct" };
+  var _a, _b;
+  const config = {};
+  let rawValue;
   const lines = content.split("\n");
   for (let i = 0; i < lines.length; i++) {
     const trimmed = lines[i].trim();
@@ -4563,11 +4590,20 @@ function parseTopicBlock(content) {
       case "scale":
       case "skala": {
         const v = value.toLowerCase();
-        if (v !== "direkt" && v !== "direct")
+        if (v === "direkt" || v === "direct")
+          config.scale = "direct";
+        else if (v === "liste" || v === "list")
+          config.scale = "list";
+        else
           throw new Error(t().topic.unknownScale(value));
-        config.scale = "direct";
         break;
       }
+      case "werte":
+      case "values":
+      case "skala-werte":
+      case "scale-values":
+        config.values = parseValueList(value);
+        break;
       case "min":
       case "minimum":
         config.min = parseNumber(key, value);
@@ -4588,7 +4624,7 @@ function parseTopicBlock(content) {
       case "wert":
       case "value":
         if (value)
-          config.value = parseNumber(key, value);
+          rawValue = value;
         break;
       case "source":
       case "from":
@@ -4614,12 +4650,32 @@ function parseTopicBlock(content) {
         break;
     }
   }
-  if (config.min === void 0)
-    throw new Error(t().topic.minRequired);
-  if (config.max === void 0)
-    throw new Error(t().topic.maxRequired);
-  if (config.min >= config.max)
-    throw new Error(t().topic.minGreaterMax);
+  (_a = config.scale) != null ? _a : config.scale = config.values ? "list" : "direct";
+  if (config.scale === "list") {
+    const values = (_b = config.values) != null ? _b : [];
+    if (values.length < 2)
+      throw new Error(t().topic.valuesRequired);
+    config.min = 0;
+    config.max = values.length - 1;
+    config.steps = values.length - 1;
+    config.exact = false;
+    if (rawValue !== void 0) {
+      const index = indexInList(values, rawValue.replace(/^["'](.*)["']$/, "$1"));
+      if (index === -1)
+        throw new Error(t().topic.unknownValue(rawValue));
+      config.value = index;
+    }
+  } else {
+    config.values = void 0;
+    if (config.min === void 0)
+      throw new Error(t().topic.minRequired);
+    if (config.max === void 0)
+      throw new Error(t().topic.maxRequired);
+    if (config.min >= config.max)
+      throw new Error(t().topic.minGreaterMax);
+    if (rawValue !== void 0)
+      config.value = parseNumber("wert", rawValue);
+  }
   if (config.source && !config.xAxis)
     throw new Error(t().topic.xAxisRequired);
   return config;
@@ -4669,6 +4725,14 @@ var TopicRenderer = class extends import_obsidian7.MarkdownRenderChild {
     const { min, max, steps } = this.config;
     return steps ? (max - min) / steps : void 0;
   }
+  /** Display text for a scale position */
+  label(pos) {
+    return this.config.values ? this.config.values[Math.round(pos)] : String(pos);
+  }
+  /** Value stored in documents and in the code block for a scale position */
+  toStored(pos) {
+    return this.config.values ? this.config.values[Math.round(pos)] : pos;
+  }
   /** Snap a value onto the scale and clamp it to [min, max] */
   snap(num) {
     const { min, max } = this.config;
@@ -4696,7 +4760,7 @@ var TopicRenderer = class extends import_obsidian7.MarkdownRenderChild {
     const valueEl = grid.createSpan({ cls: "hermione-topic-value" });
     const initial = this.snap((_a = config.value) != null ? _a : config.min);
     slider.value = String(initial);
-    valueEl.setText(String(initial));
+    valueEl.setText(this.label(initial));
     const marks = grid.createDiv({ cls: "hermione-topic-marks" });
     const labels = grid.createDiv({ cls: "hermione-topic-labels" });
     const addLabel = (fraction, text) => {
@@ -4704,13 +4768,13 @@ var TopicRenderer = class extends import_obsidian7.MarkdownRenderChild {
     };
     const { steps } = config;
     if (steps && steps <= MAX_MARKS) {
-      const labelEvery = Math.ceil(steps / MAX_LABELS);
+      const labelEvery = config.values ? 1 : Math.ceil(steps / MAX_LABELS);
       for (let i = 0; i <= steps; i++) {
         const major = i % labelEvery === 0 || i === steps;
         const mark = marks.createSpan({ cls: major ? "hermione-topic-mark is-major" : "hermione-topic-mark" });
         mark.style.left = `${i / steps * 100}%`;
         if (major)
-          addLabel(i / steps, String(clean(config.min + i * this.stepSize)));
+          addLabel(i / steps, this.label(clean(config.min + i * this.stepSize)));
       }
     } else {
       for (const fraction of [0, 1]) {
@@ -4729,16 +4793,16 @@ var TopicRenderer = class extends import_obsidian7.MarkdownRenderChild {
       this.registerDomEvent(slider, "dblclick", (evt) => {
         if (!this.isOnThumb(slider, evt.clientX))
           return;
-        void this.createDocument(this.snap(parseFloat(slider.value)));
+        void this.createDocument(this.toStored(this.snap(parseFloat(slider.value))));
       });
     }
     this.registerDomEvent(slider, "input", () => {
-      valueEl.setText(String(this.snap(parseFloat(slider.value))));
+      valueEl.setText(this.label(this.snap(parseFloat(slider.value))));
     });
     this.registerDomEvent(slider, "change", () => {
       const v = this.snap(parseFloat(slider.value));
       config.value = v;
-      void this.persistValue(v);
+      void this.persistValue(this.toStored(v));
     });
   }
   // ── Documents below the scale ────────────────────────────────────
@@ -4748,8 +4812,9 @@ var TopicRenderer = class extends import_obsidian7.MarkdownRenderChild {
     const styleFn = this.config.cardStyle ? compileTransform(this.config.cardStyle) : null;
     let docs = [];
     const load = async () => {
-      const { min, max, source, xAxis } = this.config;
+      const { min, max, source, xAxis, values } = this.config;
       let notNumeric = 0;
+      let notInList = 0;
       let outOfRange = 0;
       docs = [];
       for (const file of engine.getSourceFiles(source)) {
@@ -4759,6 +4824,15 @@ var TopicRenderer = class extends import_obsidian7.MarkdownRenderChild {
         const raw = engine.getPropertyValue(doc.properties, xAxis);
         if (raw === void 0 || raw === null || raw === "")
           continue;
+        if (values) {
+          const index = indexInList(values, raw);
+          if (index === -1) {
+            notInList++;
+            continue;
+          }
+          docs.push({ doc, value: index, style: evaluateDotStyle(doc, styleFn) });
+          continue;
+        }
         if (typeof raw !== "number" || isNaN(raw)) {
           notNumeric++;
           continue;
@@ -4772,6 +4846,8 @@ var TopicRenderer = class extends import_obsidian7.MarkdownRenderChild {
       infoEl.empty();
       if (notNumeric)
         infoEl.createDiv({ text: t().topic.notNumeric(notNumeric, xAxis) });
+      if (notInList)
+        infoEl.createDiv({ text: t().topic.notInList(notInList, xAxis) });
       if (outOfRange)
         infoEl.createDiv({ text: t().topic.outOfRange(outOfRange) });
       layout();
@@ -4828,7 +4904,7 @@ var TopicRenderer = class extends import_obsidian7.MarkdownRenderChild {
         dot.style.backgroundColor = style.color;
       if (style.border)
         dot.style.boxShadow = `inset 0 0 0 2px ${style.border}`;
-      (0, import_obsidian7.setTooltip)(dot, t().topic.docTooltip(doc.name, value));
+      (0, import_obsidian7.setTooltip)(dot, t().topic.docTooltip(doc.name, this.label(value)));
       this.makeDraggable(dot, dotsEl, doc, value);
     }
     dotsEl.style.height = `${rowEnds.length * rowHeight}px`;
@@ -4872,7 +4948,7 @@ var TopicRenderer = class extends import_obsidian7.MarkdownRenderChild {
       }
       current = valueAt(evt.clientX);
       dot.style.left = `${(current - min) / (max - min) * 100}%`;
-      badge.setText(String(current));
+      badge.setText(this.label(current));
     });
     const finish = async (evt, cancelled) => {
       if (dot.hasPointerCapture(evt.pointerId))
@@ -4889,7 +4965,7 @@ var TopicRenderer = class extends import_obsidian7.MarkdownRenderChild {
       this.dragging = false;
       if (!cancelled && current !== original) {
         await this.app.fileManager.processFrontMatter(doc.file, (fm) => {
-          fm[this.config.xAxis] = current;
+          fm[this.config.xAxis] = this.toStored(current);
         });
       } else {
         dot.style.left = `${(original - min) / (max - min) * 100}%`;

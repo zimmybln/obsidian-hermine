@@ -10,15 +10,23 @@ import type { DocumentData } from "./types";
  *
  * Scale variants (`skala` / `scale`):
  *   - "direkt" / "direct" (default): explicit min, max and number of steps
+ *   - "liste" / "list": ordered list of values (`werte`); implied by `werte`
+ *
+ * A list scale is mapped onto positions 0 … n-1 (min = 0, max = n-1,
+ * one step per entry), so slider, layout and dragging work on numbers
+ * for both variants. Only labels and stored values use the list entries.
  */
 export interface TopicConfig {
   title?: string;
   description?: string;
-  scale: "direct";
+  scale: "direct" | "list";
   min: number;
   max: number;
   /** Number of intervals between min and max; undefined = continuous */
   steps?: number;
+  /** Ordered scale entries of a list scale */
+  values?: string[];
+  /** Current slider position (for a list scale: index into values) */
   value?: number;
   /** Folder (or other QueryEngine source) whose documents are shown below the scale */
   source?: string;
@@ -63,10 +71,37 @@ function parseNumber(key: string, raw: string): number {
 }
 
 /**
+ * Parse a list of scale values. Accepts quoted or unquoted entries,
+ * optionally wrapped in brackets:
+ *   "Nicht wichtig", "mittel wichtig", wichtig
+ *   ["Nicht wichtig", "mittel wichtig", "wichtig"]
+ */
+function parseValueList(raw: string): string[] {
+  const inner = raw.trim().replace(/^\[(.*)\]$/s, "$1");
+  const values: string[] = [];
+  const re = /\s*(?:"([^"]*)"|'([^']*)'|([^,]+))/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(inner)) !== null) {
+    const v = (match[1] ?? match[2] ?? match[3]).trim();
+    if (v) values.push(v);
+  }
+  return values;
+}
+
+/** Index of a property value in the list scale (trimmed, case-insensitive); -1 if absent */
+function indexInList(values: string[], raw: unknown): number {
+  if (typeof raw !== "string" && typeof raw !== "number") return -1;
+  const needle = String(raw).trim().toLowerCase();
+  return values.findIndex(v => v.toLowerCase() === needle);
+}
+
+/**
  * Parses a hermione-topic code block content into configuration
  */
 export function parseTopicBlock(content: string): TopicConfig {
-  const config: Partial<TopicConfig> = { scale: "direct" };
+  const config: Partial<TopicConfig> = {};
+  // Resolved after parsing, once the scale variant is known
+  let rawValue: string | undefined;
 
   const lines = content.split("\n");
   for (let i = 0; i < lines.length; i++) {
@@ -100,10 +135,17 @@ export function parseTopicBlock(content: string): TopicConfig {
       case "scale":
       case "skala": {
         const v = value.toLowerCase();
-        if (v !== "direkt" && v !== "direct") throw new Error(t().topic.unknownScale(value));
-        config.scale = "direct";
+        if (v === "direkt" || v === "direct") config.scale = "direct";
+        else if (v === "liste" || v === "list") config.scale = "list";
+        else throw new Error(t().topic.unknownScale(value));
         break;
       }
+      case "werte":
+      case "values":
+      case "skala-werte":
+      case "scale-values":
+        config.values = parseValueList(value);
+        break;
       case "min":
       case "minimum":
         config.min = parseNumber(key, value);
@@ -122,7 +164,7 @@ export function parseTopicBlock(content: string): TopicConfig {
       }
       case "wert":
       case "value":
-        if (value) config.value = parseNumber(key, value);
+        if (value) rawValue = value;
         break;
       case "source":
       case "from":
@@ -149,9 +191,29 @@ export function parseTopicBlock(content: string): TopicConfig {
     }
   }
 
-  if (config.min === undefined) throw new Error(t().topic.minRequired);
-  if (config.max === undefined) throw new Error(t().topic.maxRequired);
-  if (config.min >= config.max) throw new Error(t().topic.minGreaterMax);
+  config.scale ??= config.values ? "list" : "direct";
+
+  if (config.scale === "list") {
+    const values = config.values ?? [];
+    if (values.length < 2) throw new Error(t().topic.valuesRequired);
+    // min/max/steps are derived from the list
+    config.min = 0;
+    config.max = values.length - 1;
+    config.steps = values.length - 1;
+    config.exact = false;
+    if (rawValue !== undefined) {
+      const index = indexInList(values, rawValue.replace(/^["'](.*)["']$/, "$1"));
+      if (index === -1) throw new Error(t().topic.unknownValue(rawValue));
+      config.value = index;
+    }
+  } else {
+    config.values = undefined;
+    if (config.min === undefined) throw new Error(t().topic.minRequired);
+    if (config.max === undefined) throw new Error(t().topic.maxRequired);
+    if (config.min >= config.max) throw new Error(t().topic.minGreaterMax);
+    if (rawValue !== undefined) config.value = parseNumber("wert", rawValue);
+  }
+
   if (config.source && !config.xAxis) throw new Error(t().topic.xAxisRequired);
 
   return config as TopicConfig;
@@ -219,6 +281,16 @@ export class TopicRenderer extends MarkdownRenderChild {
     return steps ? (max - min) / steps : undefined;
   }
 
+  /** Display text for a scale position */
+  private label(pos: number): string {
+    return this.config.values ? this.config.values[Math.round(pos)] : String(pos);
+  }
+
+  /** Value stored in documents and in the code block for a scale position */
+  private toStored(pos: number): string | number {
+    return this.config.values ? this.config.values[Math.round(pos)] : pos;
+  }
+
   /** Snap a value onto the scale and clamp it to [min, max] */
   private snap(num: number): number {
     const { min, max } = this.config;
@@ -248,7 +320,7 @@ export class TopicRenderer extends MarkdownRenderChild {
 
     const initial = this.snap(config.value ?? config.min);
     slider.value = String(initial);
-    valueEl.setText(String(initial));
+    valueEl.setText(this.label(initial));
 
     const marks = grid.createDiv({ cls: "hermione-topic-marks" });
     const labels = grid.createDiv({ cls: "hermione-topic-labels" });
@@ -258,13 +330,13 @@ export class TopicRenderer extends MarkdownRenderChild {
 
     const { steps } = config;
     if (steps && steps <= MAX_MARKS) {
-      // Label at most ~MAX_LABELS marks; labelled marks are drawn larger
-      const labelEvery = Math.ceil(steps / MAX_LABELS);
+      // Label at most ~MAX_LABELS marks (list scales: every entry); labelled marks are drawn larger
+      const labelEvery = config.values ? 1 : Math.ceil(steps / MAX_LABELS);
       for (let i = 0; i <= steps; i++) {
         const major = i % labelEvery === 0 || i === steps;
         const mark = marks.createSpan({ cls: major ? "hermione-topic-mark is-major" : "hermione-topic-mark" });
         mark.style.left = `${(i / steps) * 100}%`;
-        if (major) addLabel(i / steps, String(clean(config.min + i * this.stepSize!)));
+        if (major) addLabel(i / steps, this.label(clean(config.min + i * this.stepSize!)));
       }
     } else {
       // Continuous scale or too many steps: only the end points
@@ -286,18 +358,18 @@ export class TopicRenderer extends MarkdownRenderChild {
     if (config.source && config.xAxis) {
       this.registerDomEvent(slider, "dblclick", (evt) => {
         if (!this.isOnThumb(slider, evt.clientX)) return;
-        void this.createDocument(this.snap(parseFloat(slider.value)));
+        void this.createDocument(this.toStored(this.snap(parseFloat(slider.value))));
       });
     }
 
     // Live update while dragging, persist on release
     this.registerDomEvent(slider, "input", () => {
-      valueEl.setText(String(this.snap(parseFloat(slider.value))));
+      valueEl.setText(this.label(this.snap(parseFloat(slider.value))));
     });
     this.registerDomEvent(slider, "change", () => {
       const v = this.snap(parseFloat(slider.value));
       config.value = v;
-      void this.persistValue(v);
+      void this.persistValue(this.toStored(v));
     });
   }
 
@@ -310,8 +382,9 @@ export class TopicRenderer extends MarkdownRenderChild {
     let docs: PlacedDoc[] = [];
 
     const load = async () => {
-      const { min, max, source, xAxis } = this.config;
+      const { min, max, source, xAxis, values } = this.config;
       let notNumeric = 0;
+      let notInList = 0;
       let outOfRange = 0;
       docs = [];
 
@@ -320,7 +393,14 @@ export class TopicRenderer extends MarkdownRenderChild {
         if (!doc) continue;
         const raw = engine.getPropertyValue(doc.properties, xAxis!);
         if (raw === undefined || raw === null || raw === "") continue;
-        // Scale is numeric, so the property must be a number as well
+        if (values) {
+          // List scale: the property must be one of the list entries
+          const index = indexInList(values, raw);
+          if (index === -1) { notInList++; continue; }
+          docs.push({ doc, value: index, style: evaluateDotStyle(doc, styleFn) });
+          continue;
+        }
+        // Numeric scale, so the property must be a number as well
         if (typeof raw !== "number" || isNaN(raw)) { notNumeric++; continue; }
         if (raw < min || raw > max) { outOfRange++; continue; }
         docs.push({ doc, value: raw, style: evaluateDotStyle(doc, styleFn) });
@@ -328,6 +408,7 @@ export class TopicRenderer extends MarkdownRenderChild {
 
       infoEl.empty();
       if (notNumeric) infoEl.createDiv({ text: t().topic.notNumeric(notNumeric, xAxis!) });
+      if (notInList) infoEl.createDiv({ text: t().topic.notInList(notInList, xAxis!) });
       if (outOfRange) infoEl.createDiv({ text: t().topic.outOfRange(outOfRange) });
       layout();
     };
@@ -390,7 +471,7 @@ export class TopicRenderer extends MarkdownRenderChild {
       if (style.color) dot.style.backgroundColor = style.color;
       if (style.border) dot.style.boxShadow = `inset 0 0 0 2px ${style.border}`;
 
-      setTooltip(dot, t().topic.docTooltip(doc.name, value));
+      setTooltip(dot, t().topic.docTooltip(doc.name, this.label(value)));
       this.makeDraggable(dot, dotsEl, doc, value);
     }
 
@@ -439,7 +520,7 @@ export class TopicRenderer extends MarkdownRenderChild {
       current = valueAt(evt.clientX);
       // Only the horizontal position changes; the row stays the same
       dot.style.left = `${((current - min) / (max - min)) * 100}%`;
-      badge!.setText(String(current));
+      badge!.setText(this.label(current));
     });
 
     const finish = async (evt: PointerEvent, cancelled: boolean) => {
@@ -460,7 +541,7 @@ export class TopicRenderer extends MarkdownRenderChild {
       if (!cancelled && current !== original) {
         // processFrontMatter keeps the number type and handles CRLF files
         await this.app.fileManager.processFrontMatter(doc.file, (fm) => {
-          fm[this.config.xAxis!] = current;
+          fm[this.config.xAxis!] = this.toStored(current);
         });
       } else {
         dot.style.left = `${((original - min) / (max - min)) * 100}%`;
@@ -500,7 +581,7 @@ export class TopicRenderer extends MarkdownRenderChild {
    * scale property set to the given value. The document is not opened;
    * the change listener picks it up and draws its circle.
    */
-  private async createDocument(value: number): Promise<void> {
+  private async createDocument(value: string | number): Promise<void> {
     const source = this.config.source!.replace(/^"(.*)"$/, "$1");
     const folder = this.app.vault.getAbstractFileByPath(normalizePath(source));
     if (!(folder instanceof TFolder)) {
@@ -521,7 +602,7 @@ export class TopicRenderer extends MarkdownRenderChild {
   }
 
   /** Write `wert: <value>` into the code block source */
-  private async persistValue(value: number): Promise<void> {
+  private async persistValue(value: string | number): Promise<void> {
     const file = this.app.vault.getAbstractFileByPath(this.ctx.sourcePath);
     if (!(file instanceof TFile)) return;
     const info = this.ctx.getSectionInfo(this.containerEl);

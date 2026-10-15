@@ -82,11 +82,14 @@ export interface Strings {
     notANumber: (key: string, raw: string) => string;
     invalidSteps: (raw: string) => string;
     unknownScale: (raw: string) => string;
+    valuesRequired: string;
+    unknownValue: (raw: string) => string;
+    notInList: (count: number, prop: string) => string;
     xAxisRequired: string;
     newDocBaseName: string;
     created: (name: string) => string;
     sourceNotFolder: (source: string) => string;
-    docTooltip: (name: string, value: number) => string;
+    docTooltip: (name: string, value: string | number) => string;
     notNumeric: (count: number, prop: string) => string;
     outOfRange: (count: number) => string;
   };
@@ -169,7 +172,11 @@ const de: Strings = {
     minGreaterMax: "Minimalwert muss kleiner als der Maximalwert sein",
     notANumber: (key, raw) => `"${key}" erwartet eine Zahl, erhalten: "${raw}"`,
     invalidSteps: (raw) => `Schritte müssen eine ganze Zahl ≥ 1 sein, erhalten: "${raw}"`,
-    unknownScale: (raw) => `Unbekannte Skala: "${raw}" (erlaubt: direkt)`,
+    unknownScale: (raw) => `Unbekannte Skala: "${raw}" (erlaubt: direkt, liste)`,
+    valuesRequired: "Eine Listen-Skala benötigt mindestens zwei Werte (werte)",
+    unknownValue: (raw) => `Wert "${raw}" kommt in der Skala nicht vor`,
+    notInList: (count, prop) =>
+      `${count} ${count === 1 ? "Dokument hat" : "Dokumente haben"} in "${prop}" einen Wert, der nicht in der Skala vorkommt`,
     xAxisRequired: "Mit source muss auch x-achse (Eigenschaft der Dokumente) angegeben werden",
     newDocBaseName: "Dokument",
     created: (name) => `"${name}" erstellt`,
@@ -259,7 +266,11 @@ const en: Strings = {
     minGreaterMax: "Minimum must be less than maximum",
     notANumber: (key, raw) => `"${key}" expects a number, got: "${raw}"`,
     invalidSteps: (raw) => `Steps must be an integer ≥ 1, got: "${raw}"`,
-    unknownScale: (raw) => `Unknown scale: "${raw}" (allowed: direct)`,
+    unknownScale: (raw) => `Unknown scale: "${raw}" (allowed: direct, list)`,
+    valuesRequired: "A list scale requires at least two values (values)",
+    unknownValue: (raw) => `Value "${raw}" is not part of the scale`,
+    notInList: (count, prop) =>
+      `${count} ${count === 1 ? "document has" : "documents have"} a value in "${prop}" that is not part of the scale`,
     xAxisRequired: "When source is set, x-axis (document property) is required",
     newDocBaseName: "Document",
     created: (name) => `"${name}" created`,
