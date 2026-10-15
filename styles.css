@@ -13,6 +13,13 @@
   font-size: 1.2em;
 }
 
+/* Description */
+.hermione-description {
+  margin: 0 0 0.75em 0;
+  padding: 0;
+  color: var(--text-muted);
+}
+
 /* Error display */
 .hermione-errors {
   padding: 1em;
@@ -1420,4 +1427,241 @@
   .hermione-card-title {
     font-size: var(--font-ui-smaller);
   }
+}
+
+/* ── Dedicated Hermione View (.hermione files) ────────────────── */
+
+.hermione-dedicated-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.hermione-view-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  background-color: var(--background-secondary);
+  flex-shrink: 0;
+}
+
+.hermione-view-toolbar-title {
+  flex: 1;
+  font-weight: var(--font-semibold);
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: text;
+  border-radius: var(--radius-s);
+  padding: 2px 4px;
+}
+
+.hermione-view-toolbar-title:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.hermione-view-rename-input {
+  width: 100%;
+  font-weight: var(--font-semibold);
+  font-size: var(--font-ui-small);
+  font-family: inherit;
+  color: var(--text-normal);
+  background: var(--background-primary);
+  border: 1px solid var(--interactive-accent);
+  border-radius: var(--radius-s);
+  padding: 1px 4px;
+  outline: none;
+}
+
+.hermione-view-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.hermione-view-btn:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.hermione-view-editor {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.hermione-view-editor textarea {
+  flex: 1;
+  resize: none;
+  padding: 16px;
+  border: none;
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-medium);
+  line-height: 1.6;
+  outline: none;
+}
+
+.hermione-view-content {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+}
+
+.hermione-view-content .hermione-container {
+  margin: 0;
+}
+
+/* hermione-topic: interactive slider */
+.hermione-topic {
+  margin: 1em 0;
+  /* horizontal inset so marks line up with the thumb centre at min/max */
+  --hermione-topic-inset: calc(var(--slider-thumb-width, 18px) / 2);
+}
+
+.hermione-topic-grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 0.75em;
+  align-items: center;
+}
+
+/* Selector must outrank Obsidian's input[type='range'] rule, which sets a fixed width */
+.hermione-topic input.hermione-topic-slider[type="range"] {
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: stretch;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  margin: 0;
+}
+
+.hermione-topic-value {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 3em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-semibold);
+  color: var(--text-normal);
+}
+
+.hermione-topic-marks,
+.hermione-topic-labels {
+  grid-column: 1;
+  position: relative;
+  margin: 0 var(--hermione-topic-inset);
+}
+
+.hermione-topic-marks {
+  grid-row: 2;
+  height: 10px;
+  margin-top: 2px;
+}
+
+.hermione-topic-mark {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  height: 5px;
+  transform: translateX(-50%);
+  background-color: var(--text-faint);
+}
+
+.hermione-topic-mark.is-major {
+  height: 9px;
+  background-color: var(--text-muted);
+}
+
+.hermione-topic-labels {
+  grid-row: 3;
+  height: 1.4em;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.hermione-topic-label {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+/* Documents below the scale (size/gap in sync with DOT_SIZE/DOT_GAP in topic.ts) */
+.hermione-topic-docs,
+.hermione-topic-docs-info {
+  grid-column: 1;
+  margin: 0 var(--hermione-topic-inset);
+}
+
+.hermione-topic-docs {
+  grid-row: 4;
+  position: relative;
+  margin-top: 6px;
+}
+
+.hermione-topic-doc {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  background-color: var(--interactive-accent);
+  cursor: pointer;
+}
+
+/* outline instead of background/box-shadow so it also works with card-style inline styles */
+.hermione-topic-doc:hover {
+  outline: 2px solid var(--text-muted);
+  outline-offset: 1px;
+}
+
+.hermione-topic-docs-info {
+  grid-row: 5;
+  margin-top: 4px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+}
+
+/* Dragging a document circle */
+.hermione-topic-doc {
+  touch-action: none;
+}
+
+.hermione-topic-doc.is-dragging {
+  cursor: grabbing;
+  z-index: 2;
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+
+.hermione-topic-doc-badge {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 6px;
+  border-radius: var(--radius-s);
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  font-size: var(--font-ui-smaller);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-normal);
+  white-space: nowrap;
+  pointer-events: none;
 }

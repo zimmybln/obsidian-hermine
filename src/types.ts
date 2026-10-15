@@ -6,6 +6,8 @@ import { TFile } from "obsidian";
 export interface HermioneConfig {
   /** Title displayed at the top of the view */
   title?: string;
+  /** Description displayed below the title */
+  description?: string;
   /** Source query - folder path, tag, or special query like "all" */
   source: string;
   /** Property name for X-axis values (required unless yAxis is set) */

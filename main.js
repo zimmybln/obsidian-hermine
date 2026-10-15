@@ -27,7 +27,192 @@ __export(main_exports, {
   default: () => HermionePlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian6 = require("obsidian");
+var import_obsidian8 = require("obsidian");
+
+// src/i18n.ts
+var de = {
+  ribbon: {
+    createNew: "Neue Hermione-Ansicht erstellen"
+  },
+  contextMenu: {
+    newView: "Neue Hermione-Ansicht 2"
+  },
+  file: {
+    newViewBaseName: "Neue Hermione-Ansicht",
+    templateContent: "source:\nx-achse:\ny-achse:\n"
+  },
+  settings: {
+    heading: "Hermione Einstellungen",
+    autoRefreshName: "Automatisch aktualisieren",
+    autoRefreshDesc: "Aktualisiert die Ansicht automatisch, wenn Dokumente ge\xE4ndert werden",
+    defaultSortName: "Standard-Sortierung",
+    defaultSortDesc: "Standard-Sortierrichtung f\xFCr Abfragen",
+    sortAsc: "Aufsteigend",
+    sortDesc: "Absteigend",
+    usageHeading: "Verwendung"
+  },
+  view: {
+    edit: "Bearbeiten",
+    preview: "Vorschau",
+    refresh: "Aktualisieren",
+    renameTitle: "Klicken zum Umbenennen",
+    empty: "Keine Konfiguration vorhanden. Klicke auf den Bleistift-Button, um die Hermione-Konfiguration zu bearbeiten.",
+    errorPrefix: "Hermione Fehler: ",
+    renameError: (msg) => `Umbenennen fehlgeschlagen: ${msg}`
+  },
+  renderer: {
+    noDocuments: "Keine Dokumente gefunden.",
+    unassigned: "Nicht zugeordnet:",
+    previewUnavailable: "Vorschau nicht verf\xFCgbar",
+    editTitle: "Bearbeiten",
+    saveTitle: "Speichern",
+    cancelTitle: "Abbrechen",
+    refreshBtn: "Aktualisieren",
+    zoomIn: "Vergr\xF6\xDFern",
+    zoomOut: "Verkleinern",
+    zoomReset: "Zoom zur\xFCcksetzen",
+    zoomSlider: "Zoom",
+    error: (msg) => `Hermione Fehler: ${msg}`
+  },
+  parser: {
+    sourceRequired: "Quelle (source) ist erforderlich",
+    xAxisRequired: "X-Achsen-Eigenschaft (x-achse) ist erforderlich"
+  },
+  query: {
+    filterError: (msg) => `Filterfehler: ${msg}`,
+    queryError: (msg) => `Abfragefehler: ${msg}`
+  },
+  valuePicker: {
+    heading: (axisName) => `Wert f\xFCr "${axisName}" w\xE4hlen`,
+    targetGroup: (groupLabel) => `Zielgruppe: ${groupLabel}`,
+    placeholder: "Wert eingeben...",
+    existingValues: "Vorhandene Werte:",
+    confirm: "\xDCbernehmen",
+    cancel: "Abbrechen",
+    valid: (raw, transformed) => `\u2713 Wert ${raw} \u2192 Gruppe "${transformed}"`,
+    invalid: (raw, transformed, groupLabel) => `\u2717 Wert ${raw} geh\xF6rt zu Gruppe "${transformed}", nicht "${groupLabel}"`
+  },
+  exactValue: {
+    heading: (axisName) => `Exakter Wert f\xFCr "${axisName}"`,
+    range: (min, max) => `Bereich: ${min} \u2013 ${max}`,
+    enterNumber: "Bitte eine Zahl eingeben",
+    outOfRange: (min, max) => `Wert muss zwischen ${min} und ${max} liegen`,
+    valueLabel: (num) => `Wert: ${num}`,
+    confirm: "\xDCbernehmen",
+    cancel: "Abbrechen"
+  },
+  topic: {
+    minRequired: "Minimalwert (min) ist erforderlich",
+    maxRequired: "Maximalwert (max) ist erforderlich",
+    minGreaterMax: "Minimalwert muss kleiner als der Maximalwert sein",
+    notANumber: (key, raw) => `"${key}" erwartet eine Zahl, erhalten: "${raw}"`,
+    invalidSteps: (raw) => `Schritte m\xFCssen eine ganze Zahl \u2265 1 sein, erhalten: "${raw}"`,
+    unknownScale: (raw) => `Unbekannte Skala: "${raw}" (erlaubt: direkt)`,
+    xAxisRequired: "Mit source muss auch x-achse (Eigenschaft der Dokumente) angegeben werden",
+    newDocBaseName: "Dokument",
+    created: (name) => `"${name}" erstellt`,
+    sourceNotFolder: (source) => `Neue Dokumente ben\xF6tigen ein Verzeichnis als Quelle, nicht "${source}"`,
+    docTooltip: (name, value) => `${name}: ${value}`,
+    notNumeric: (count, prop) => `${count} ${count === 1 ? "Dokument hat" : "Dokumente haben"} keinen Zahlenwert in "${prop}"`,
+    outOfRange: (count) => `${count} ${count === 1 ? "Dokument liegt" : "Dokumente liegen"} au\xDFerhalb der Skala`
+  }
+};
+var en = {
+  ribbon: {
+    createNew: "Create new Hermione view"
+  },
+  contextMenu: {
+    newView: "New Hermione view"
+  },
+  file: {
+    newViewBaseName: "New Hermione View",
+    templateContent: "source:\nx-axis:\ny-axis:\n"
+  },
+  settings: {
+    heading: "Hermione Settings",
+    autoRefreshName: "Auto-refresh",
+    autoRefreshDesc: "Automatically refreshes the view when documents change",
+    defaultSortName: "Default sort",
+    defaultSortDesc: "Default sort direction for queries",
+    sortAsc: "Ascending",
+    sortDesc: "Descending",
+    usageHeading: "Usage"
+  },
+  view: {
+    edit: "Edit",
+    preview: "Preview",
+    refresh: "Refresh",
+    renameTitle: "Click to rename",
+    empty: "No configuration found. Click the pencil button to edit the Hermione configuration.",
+    errorPrefix: "Hermione Error: ",
+    renameError: (msg) => `Rename failed: ${msg}`
+  },
+  renderer: {
+    noDocuments: "No documents found.",
+    unassigned: "Unassigned:",
+    previewUnavailable: "Preview not available",
+    editTitle: "Edit",
+    saveTitle: "Save",
+    cancelTitle: "Cancel",
+    refreshBtn: "Refresh",
+    zoomIn: "Zoom in",
+    zoomOut: "Zoom out",
+    zoomReset: "Reset zoom",
+    zoomSlider: "Zoom",
+    error: (msg) => `Hermione Error: ${msg}`
+  },
+  parser: {
+    sourceRequired: "Source is required",
+    xAxisRequired: "X-Axis property is required"
+  },
+  query: {
+    filterError: (msg) => `Filter error: ${msg}`,
+    queryError: (msg) => `Query error: ${msg}`
+  },
+  valuePicker: {
+    heading: (axisName) => `Choose value for "${axisName}"`,
+    targetGroup: (groupLabel) => `Target group: ${groupLabel}`,
+    placeholder: "Enter value...",
+    existingValues: "Existing values:",
+    confirm: "Apply",
+    cancel: "Cancel",
+    valid: (raw, transformed) => `\u2713 Value ${raw} \u2192 group "${transformed}"`,
+    invalid: (raw, transformed, groupLabel) => `\u2717 Value ${raw} belongs to group "${transformed}", not "${groupLabel}"`
+  },
+  exactValue: {
+    heading: (axisName) => `Exact value for "${axisName}"`,
+    range: (min, max) => `Range: ${min} \u2013 ${max}`,
+    enterNumber: "Please enter a number",
+    outOfRange: (min, max) => `Value must be between ${min} and ${max}`,
+    valueLabel: (num) => `Value: ${num}`,
+    confirm: "Apply",
+    cancel: "Cancel"
+  },
+  topic: {
+    minRequired: "Minimum value (min) is required",
+    maxRequired: "Maximum value (max) is required",
+    minGreaterMax: "Minimum must be less than maximum",
+    notANumber: (key, raw) => `"${key}" expects a number, got: "${raw}"`,
+    invalidSteps: (raw) => `Steps must be an integer \u2265 1, got: "${raw}"`,
+    unknownScale: (raw) => `Unknown scale: "${raw}" (allowed: direct)`,
+    xAxisRequired: "When source is set, x-axis (document property) is required",
+    newDocBaseName: "Document",
+    created: (name) => `"${name}" created`,
+    sourceNotFolder: (source) => `New documents require a folder as source, not "${source}"`,
+    docTooltip: (name, value) => `${name}: ${value}`,
+    notNumeric: (count, prop) => `${count} ${count === 1 ? "document has" : "documents have"} no numeric value in "${prop}"`,
+    outOfRange: (count) => `${count} ${count === 1 ? "document lies" : "documents lie"} outside the scale`
+  }
+};
+var translations = { de, en };
+function detectLanguage() {
+  var _a, _b, _c;
+  const locale = (_c = (_b = (_a = window.moment) == null ? void 0 : _a.locale) == null ? void 0 : _b.call(_a)) != null ? _c : navigator.language.split("-")[0];
+  return locale in translations ? locale : "en";
+}
+function t() {
+  return translations[detectLanguage()];
+}
 
 // src/parser.ts
 var FUNCTION_KEYS = /* @__PURE__ */ new Set([
@@ -112,6 +297,11 @@ function parseHermioneBlock(content) {
       case "titel":
       case "\xFCberschrift":
         config.title = value;
+        break;
+      case "description":
+      case "beschreibung":
+      case "desc":
+        config.description = value;
         break;
       case "source":
       case "from":
@@ -442,7 +632,7 @@ var QueryEngine = class {
             }
           }
         } catch (e) {
-          result.errors.push(`Filter error: ${e.message}`);
+          result.errors.push(t().query.filterError(e.message));
         }
       }
       result.xAxisRawValues = xRawValues;
@@ -451,7 +641,7 @@ var QueryEngine = class {
         result.documents = this.sortDocuments(result.documents, config.sort);
       }
     } catch (error) {
-      result.errors.push(`Query error: ${error.message}`);
+      result.errors.push(t().query.queryError(error.message));
     }
     return result;
   }
@@ -470,7 +660,7 @@ var QueryEngine = class {
         const cache = this.app.metadataCache.getFileCache(file);
         if (cache) {
           const tags = (0, import_obsidian.getAllTags)(cache) || [];
-          if (tags.some((t) => t.toLowerCase() === tag || t.toLowerCase().startsWith(tag + "/"))) {
+          if (tags.some((t2) => t2.toLowerCase() === tag || t2.toLowerCase().startsWith(tag + "/"))) {
             files.push(file);
           }
         }
@@ -760,17 +950,17 @@ var ValuePickerModal = class extends import_obsidian2.Modal {
     const { contentEl } = this;
     contentEl.addClass("hermione-value-picker-modal");
     contentEl.createEl("h3", {
-      text: `Wert f\xFCr "${this.axisName}" w\xE4hlen`
+      text: t().valuePicker.heading(this.axisName)
     });
     contentEl.createEl("p", {
       cls: "hermione-picker-info",
-      text: `Zielgruppe: ${this.groupLabel}`
+      text: t().valuePicker.targetGroup(this.groupLabel)
     });
     const inputContainer = contentEl.createDiv({ cls: "hermione-picker-input-container" });
     const input = inputContainer.createEl("input", {
       cls: "hermione-picker-input",
       type: "text",
-      placeholder: "Wert eingeben..."
+      placeholder: t().valuePicker.placeholder
     });
     input.focus();
     const validation = contentEl.createDiv({ cls: "hermione-picker-validation" });
@@ -778,7 +968,7 @@ var ValuePickerModal = class extends import_obsidian2.Modal {
       const suggestionsContainer = contentEl.createDiv({ cls: "hermione-picker-suggestions" });
       suggestionsContainer.createEl("span", {
         cls: "hermione-picker-suggestions-label",
-        text: "Vorhandene Werte:"
+        text: t().valuePicker.existingValues
       });
       const suggestionsWrapper = suggestionsContainer.createDiv({ cls: "hermione-picker-suggestions-list" });
       for (const val of this.existingValues.sort()) {
@@ -795,12 +985,12 @@ var ValuePickerModal = class extends import_obsidian2.Modal {
     const buttonContainer = contentEl.createDiv({ cls: "hermione-picker-buttons" });
     const confirmBtn = buttonContainer.createEl("button", {
       cls: "hermione-picker-confirm mod-cta",
-      text: "\xDCbernehmen"
+      text: t().valuePicker.confirm
     });
     confirmBtn.disabled = true;
     const cancelBtn = buttonContainer.createEl("button", {
       cls: "hermione-picker-cancel",
-      text: "Abbrechen"
+      text: t().valuePicker.cancel
     });
     const validateInput = () => {
       const raw = input.value.trim();
@@ -813,11 +1003,11 @@ var ValuePickerModal = class extends import_obsidian2.Modal {
       const parsed = this.parseInputValue(raw);
       const transformed = String(applyTransform(parsed, this.transformFn));
       if (transformed === this.groupLabel) {
-        validation.textContent = `\u2713 Wert ${raw} \u2192 Gruppe "${transformed}"`;
+        validation.textContent = t().valuePicker.valid(raw, transformed);
         validation.className = "hermione-picker-validation hermione-picker-valid";
         confirmBtn.disabled = false;
       } else {
-        validation.textContent = `\u2717 Wert ${raw} geh\xF6rt zu Gruppe "${transformed}", nicht "${this.groupLabel}"`;
+        validation.textContent = t().valuePicker.invalid(raw, transformed, this.groupLabel);
         validation.className = "hermione-picker-validation hermione-picker-invalid";
         confirmBtn.disabled = true;
       }
@@ -881,11 +1071,11 @@ var ExactValueModal = class extends import_obsidian3.Modal {
     const { contentEl } = this;
     contentEl.addClass("hermione-exact-modal");
     contentEl.createEl("h3", {
-      text: `Exakter Wert f\xFCr "${this.axisName}"`
+      text: t().exactValue.heading(this.axisName)
     });
     contentEl.createEl("p", {
       cls: "hermione-exact-info",
-      text: `Bereich: ${this.rangeMin} \u2013 ${this.rangeMax}`
+      text: t().exactValue.range(this.rangeMin, this.rangeMax)
     });
     const inputRow = contentEl.createDiv({ cls: "hermione-exact-input-row" });
     const input = inputRow.createEl("input", {
@@ -916,15 +1106,15 @@ var ExactValueModal = class extends import_obsidian3.Modal {
     const updateValidation = () => {
       const num = parseFloat(input.value);
       if (isNaN(num)) {
-        validation.textContent = "Bitte eine Zahl eingeben";
+        validation.textContent = t().exactValue.enterNumber;
         validation.className = "hermione-exact-validation hermione-picker-invalid";
         confirmBtn.disabled = true;
       } else if (num < this.rangeMin || num > this.rangeMax) {
-        validation.textContent = `Wert muss zwischen ${this.rangeMin} und ${this.rangeMax} liegen`;
+        validation.textContent = t().exactValue.outOfRange(this.rangeMin, this.rangeMax);
         validation.className = "hermione-exact-validation hermione-picker-invalid";
         confirmBtn.disabled = true;
       } else {
-        validation.textContent = `Wert: ${num}`;
+        validation.textContent = t().exactValue.valueLabel(num);
         validation.className = "hermione-exact-validation hermione-picker-valid";
         confirmBtn.disabled = false;
       }
@@ -932,11 +1122,11 @@ var ExactValueModal = class extends import_obsidian3.Modal {
     const buttonContainer = contentEl.createDiv({ cls: "hermione-picker-buttons" });
     const confirmBtn = buttonContainer.createEl("button", {
       cls: "hermione-picker-confirm mod-cta",
-      text: "\xDCbernehmen"
+      text: t().exactValue.confirm
     });
     const cancelBtn = buttonContainer.createEl("button", {
       cls: "hermione-picker-cancel",
-      text: "Abbrechen"
+      text: t().exactValue.cancel
     });
     const confirm = () => {
       if (confirmBtn.disabled)
@@ -1028,6 +1218,12 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
         text: this.config.title
       });
     }
+    if (this.config.description) {
+      this.containerEl.createEl("p", {
+        cls: "hermione-description",
+        text: this.config.description
+      });
+    }
     if (this.result.errors.length > 0) {
       this.renderErrors();
       return;
@@ -1057,7 +1253,7 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
   renderEmptyState() {
     this.containerEl.createDiv({
       cls: "hermione-empty",
-      text: "Keine Dokumente gefunden."
+      text: t().renderer.noDocuments
     });
   }
   /**
@@ -1561,7 +1757,7 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
         new import_obsidian4.Component()
       );
     } catch (error) {
-      content.createSpan({ text: "Vorschau nicht verf\xFCgbar", cls: "hermione-preview-error" });
+      content.createSpan({ text: t().renderer.previewUnavailable, cls: "hermione-preview-error" });
     }
   }
   /**
@@ -2225,7 +2421,7 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
     if (unassigned.length === 0)
       return;
     const section = this.containerEl.createDiv({ cls: "hermione-unassigned" });
-    section.createEl("strong", { text: "Nicht zugeordnet:" });
+    section.createEl("strong", { text: t().renderer.unassigned });
     const items = section.createDiv({ cls: "hermione-unassigned-items" });
     for (const doc of unassigned) {
       this.renderDocumentCard(items, doc);
@@ -2256,14 +2452,14 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
     }
     const editBtn = wrapper.createEl("button", { cls: "hermione-edit-btn" });
     (0, import_obsidian4.setIcon)(editBtn, "pencil");
-    editBtn.title = "Bearbeiten";
+    editBtn.title = t().renderer.editTitle;
     const saveBtn = wrapper.createEl("button", { cls: "hermione-save-btn" });
     (0, import_obsidian4.setIcon)(saveBtn, "check");
-    saveBtn.title = "Speichern";
+    saveBtn.title = t().renderer.saveTitle;
     saveBtn.style.display = "none";
     const cancelBtn = wrapper.createEl("button", { cls: "hermione-cancel-btn" });
     (0, import_obsidian4.setIcon)(cancelBtn, "x");
-    cancelBtn.title = "Abbrechen";
+    cancelBtn.title = t().renderer.cancelTitle;
     cancelBtn.style.display = "none";
     const enterEditMode = () => {
       display.style.display = "none";
@@ -2328,17 +2524,17 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
       const zoomControls = toolbar.createDiv({ cls: "hermione-zoom-controls" });
       const zoomOutBtn = zoomControls.createEl("button", { cls: "hermione-zoom-btn" });
       (0, import_obsidian4.setIcon)(zoomOutBtn, "minus");
-      zoomOutBtn.title = "Verkleinern";
+      zoomOutBtn.title = t().renderer.zoomOut;
       zoomOutBtn.addEventListener("click", () => this.zoomOut());
       this.zoomDisplay = zoomControls.createEl("button", {
         cls: "hermione-zoom-display",
         text: `${this.zoomLevel}%`
       });
-      this.zoomDisplay.title = "Zoom zur\xFCcksetzen";
+      this.zoomDisplay.title = t().renderer.zoomReset;
       this.zoomDisplay.addEventListener("click", () => this.resetZoom());
       const zoomInBtn = zoomControls.createEl("button", { cls: "hermione-zoom-btn" });
       (0, import_obsidian4.setIcon)(zoomInBtn, "plus");
-      zoomInBtn.title = "Vergr\xF6\xDFern";
+      zoomInBtn.title = t().renderer.zoomIn;
       zoomInBtn.addEventListener("click", () => this.zoomIn());
       const slider = zoomControls.createEl("input", {
         cls: "hermione-zoom-slider",
@@ -2348,7 +2544,7 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
       slider.max = String(_MatrixRenderer.ZOOM_MAX);
       slider.step = String(_MatrixRenderer.ZOOM_STEP);
       slider.value = String(this.zoomLevel);
-      slider.title = "Zoom";
+      slider.title = t().renderer.zoomSlider;
       slider.addEventListener("input", (e) => {
         this.zoomLevel = parseInt(e.target.value);
         this.applyZoom();
@@ -2356,7 +2552,7 @@ var _MatrixRenderer = class extends import_obsidian4.MarkdownRenderChild {
     }
     const refreshBtn = toolbar.createEl("button", {
       cls: "hermione-refresh-btn",
-      text: "Aktualisieren"
+      text: t().renderer.refreshBtn
     });
     (0, import_obsidian4.setIcon)(refreshBtn, "refresh-cw");
     refreshBtn.addEventListener("click", () => this.onRefresh());
@@ -2628,20 +2824,23 @@ function getCellRange(cellValue, allCellValues) {
 var GAP = 8;
 var HEADER_PAD = 12;
 var CELL_PAD = 8;
-var CARD_MIN_H = 28;
 var CARD_PAD_V = 6;
 var LINE_HEIGHT = 16;
 var CARD_FONT = `500 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
-var CARD_GAP = 6;
 var COLOR_BAR_W = 4;
 var CARD_RADIUS = 4;
 var CELL_RADIUS = 6;
 var HEADER_RADIUS = 4;
-var MIN_CELL_W = 150;
-var MIN_CELL_H = 100;
+var MIN_CELL_W = 120;
+var MIN_CELL_H = 80;
 var Y_HEADER_W = 110;
 var HANDLE_SIZE = 8;
 var DRAG_THRESHOLD = 5;
+var DOT_RADIUS = 12;
+var DOT_GAP = 6;
+var DOT_SPACING = DOT_RADIUS * 2 + DOT_GAP;
+var GROUP_BG_PAD = 12;
+var GROUP_BG_ALPHA = 0.12;
 var ZOOM_MIN = 50;
 var ZOOM_MAX = 150;
 var ZOOM_STEP = 10;
@@ -2681,6 +2880,8 @@ var CanvasRenderer = class extends import_obsidian5.MarkdownRenderChild {
     this.resizeState = null;
     // Text measurement (offscreen)
     this.measureCtx = null;
+    // Dot-mode: groups of multiple dots sharing the same cell
+    this.dotGroups = [];
     // Theme colors (resolved from CSS vars)
     this.colors = {
       bg: "#1e1e2e",
@@ -2926,6 +3127,9 @@ var CanvasRenderer = class extends import_obsidian5.MarkdownRenderChild {
     if (this.config.title) {
       this.containerEl.createEl("h3", { cls: "hermione-title", text: this.config.title });
     }
+    if (this.config.description) {
+      this.containerEl.createEl("p", { cls: "hermione-description", text: this.config.description });
+    }
     if (this.result.errors.length > 0) {
       const errorContainer = this.containerEl.createDiv({ cls: "hermione-errors" });
       for (const error of this.result.errors) {
@@ -2934,7 +3138,7 @@ var CanvasRenderer = class extends import_obsidian5.MarkdownRenderChild {
       return;
     }
     if (this.result.documents.length === 0) {
-      this.containerEl.createDiv({ cls: "hermione-empty", text: "Keine Dokumente gefunden." });
+      this.containerEl.createDiv({ cls: "hermione-empty", text: t().renderer.noDocuments });
       return;
     }
     this.resolveColors();
@@ -3034,25 +3238,15 @@ var CanvasRenderer = class extends import_obsidian5.MarkdownRenderChild {
       lines.push(currentLine);
     return lines.length > 0 ? lines : [""];
   }
-  measureCard(name, cardWidth) {
-    const textMaxW = cardWidth - COLOR_BAR_W - 16;
-    const lines = this.wrapText(name, textMaxW);
-    const height = Math.max(CARD_MIN_H, CARD_PAD_V * 2 + lines.length * LINE_HEIGHT);
-    return { lines, height };
-  }
   // ── Value-to-Pixel Interpolation ─────────────────────────────────
   /**
    * Maps a raw numeric value to an exact pixel position on the given axis.
-   * Uses linear interpolation across the full grid extent:
-   *   first axis value → center of first cell
-   *   last axis value  → center of last cell
-   * Values outside the range are extrapolated.
+   * Uses piecewise linear interpolation between adjacent cell centers so that
+   * non-uniform axis spacing and variable cell heights are handled correctly.
    */
   interpolatePosition(rawValue, axisValues, axis) {
-    if (isNaN(rawValue)) {
-      console.warn("Hermione interp: rawValue is NaN");
+    if (isNaN(rawValue))
       return null;
-    }
     const entries = [];
     for (let i = 0; i < axisValues.length; i++) {
       const v = parseFloat(String(axisValues[i]));
@@ -3068,20 +3262,24 @@ var CanvasRenderer = class extends import_obsidian5.MarkdownRenderChild {
         center: axis === "x" ? cell.rect.x + cell.rect.w / 2 : cell.rect.y + cell.rect.h / 2
       });
     }
-    console.warn("Hermione interp:", { rawValue, axis, entriesLen: entries.length, axisValuesLen: axisValues.length, cellsLen: this.cells.length });
-    if (entries.length < 2) {
-      console.warn("Hermione interp: entries < 2, returning null");
+    if (entries.length < 2)
       return null;
-    }
     entries.sort((a, b) => a.val - b.val);
-    const first = entries[0];
-    const last = entries[entries.length - 1];
-    if (first.val === last.val)
-      return null;
-    const t = (rawValue - first.val) / (last.val - first.val);
-    const result = first.center + t * (last.center - first.center);
-    console.warn("Hermione interp result:", { rawValue, first: first.val, last: last.val, t, result });
-    return result;
+    if (rawValue <= entries[0].val)
+      return entries[0].center;
+    if (rawValue >= entries[entries.length - 1].val)
+      return entries[entries.length - 1].center;
+    for (let i = 0; i < entries.length - 1; i++) {
+      const a = entries[i];
+      const b = entries[i + 1];
+      if (rawValue >= a.val && rawValue <= b.val) {
+        if (a.val === b.val)
+          return a.center;
+        const t2 = (rawValue - a.val) / (b.val - a.val);
+        return a.center + t2 * (b.center - a.center);
+      }
+    }
+    return null;
   }
   // ── Layout Calculation ───────────────────────────────────────────
   calculateLayout() {
@@ -3089,6 +3287,7 @@ var CanvasRenderer = class extends import_obsidian5.MarkdownRenderChild {
     this.xHeaders = [];
     this.yHeaders = [];
     this.cards = [];
+    this.dotGroups = [];
     if (this.isSingleAxis) {
       this.calculateSingleAxisLayout();
     } else {
@@ -3120,28 +3319,13 @@ var CanvasRenderer = class extends import_obsidian5.MarkdownRenderChild {
         });
       }
     }
-    const cardW = cellW - CELL_PAD * 2;
-    const cardMeasurements = [];
-    for (let yi = 0; yi < yCount; yi++) {
-      cardMeasurements[yi] = [];
-      for (let xi = 0; xi < xCount; xi++) {
-        cardMeasurements[yi][xi] = cellDocs[yi][xi].map(
-          (doc) => this.measureCard(doc.name, cardW)
-        );
-      }
-    }
     const rowHeights = [];
     for (let yi = 0; yi < yCount; yi++) {
-      let maxContentH = 0;
+      let maxClusterH = 0;
       for (let xi = 0; xi < xCount; xi++) {
-        const measurements = cardMeasurements[yi][xi];
-        if (measurements.length > 0) {
-          const totalCardH = measurements.reduce((sum, m) => sum + m.height, 0);
-          const totalGap = (measurements.length - 1) * CARD_GAP;
-          maxContentH = Math.max(maxContentH, totalCardH + totalGap + CELL_PAD * 2);
-        }
+        maxClusterH = Math.max(maxClusterH, this.dotClusterHeight(cellDocs[yi][xi].length));
       }
-      rowHeights[yi] = Math.max(MIN_CELL_H, maxContentH);
+      rowHeights[yi] = Math.max(MIN_CELL_H, maxClusterH + CELL_PAD * 2);
     }
     const originX = GAP;
     const originY = GAP;
@@ -3174,24 +3358,9 @@ var CanvasRenderer = class extends import_obsidian5.MarkdownRenderChild {
           yIdx: yi
         });
         const docs = cellDocs[yi][xi];
-        const measurements = cardMeasurements[yi][xi];
-        let cardOffsetY = 0;
-        for (let di = 0; di < docs.length; di++) {
-          const m = measurements[di];
-          const cardX = cx + CELL_PAD;
-          const cardY = curY + CELL_PAD + cardOffsetY;
-          const style = evaluateCardStyle(docs[di], this.cardStyleFn);
-          this.cards.push({
-            doc: docs[di],
-            rect: { x: cardX, y: cardY, w: cardW, h: m.height },
-            style,
-            colorBarColor: style.color || getDocumentColor(docs[di].name),
-            isRange: false,
-            isVertical: false,
-            textLines: m.lines
-          });
-          cardOffsetY += m.height + CARD_GAP;
-        }
+        const cellCX = cx + cellW / 2;
+        const cellCY = curY + rowHeights[yi] / 2;
+        this.placeDots(docs, cellCX, cellCY);
       }
       curY += rowH + GAP;
     }
@@ -3207,7 +3376,6 @@ var CanvasRenderer = class extends import_obsidian5.MarkdownRenderChild {
         let top = startCell.rect.y;
         let right = endCell.rect.x + endCell.rect.w;
         let bottom = endCell.rect.y + endCell.rect.h;
-        console.warn("Hermione range card:", { doc: layout.doc.name, hasXRange: layout.hasXRange, hasYRange: layout.hasYRange, xAxis: this.config.xAxis, xAxisEnd: this.config.xAxisEnd, yAxis: this.config.yAxis, yAxisEnd: this.config.yAxisEnd });
         if (layout.hasXRange && this.config.xAxis && this.config.xAxisEnd) {
           const rawStart = getPropertyValue(layout.doc.properties, this.config.xAxis);
           const rawEnd = getPropertyValue(layout.doc.properties, this.config.xAxisEnd);
@@ -3293,17 +3461,11 @@ var CanvasRenderer = class extends import_obsidian5.MarkdownRenderChild {
     const originX = GAP;
     const originY = GAP;
     if (this.isYOnly) {
-      const cellW = Math.max(MIN_CELL_W, 300);
-      const cardW = cellW - CELL_PAD * 2;
-      const headerH = 44;
+      const cellW = Math.max(MIN_CELL_W, 180);
       let curY = originY;
       for (let i = 0; i < axisValues.length; i++) {
         const docs = axisDocs[i];
-        const measurements = docs.map((doc) => this.measureCard(doc.name, cardW));
-        const totalCardH = measurements.reduce((sum, m) => sum + m.height, 0);
-        const totalGap = Math.max(0, docs.length - 1) * CARD_GAP;
-        const contentH = docs.length > 0 ? totalCardH + totalGap + CELL_PAD * 2 : CELL_PAD * 2;
-        const rowH = Math.max(60, contentH);
+        const rowH = Math.max(60, this.dotClusterHeight(docs.length) + CELL_PAD * 2);
         this.yHeaders.push({
           rect: { x: originX, y: curY, w: Y_HEADER_W, h: rowH },
           label: String(axisValues[i]),
@@ -3318,23 +3480,7 @@ var CanvasRenderer = class extends import_obsidian5.MarkdownRenderChild {
           xIdx: -1,
           yIdx: i
         });
-        let cardOffsetY = 0;
-        for (let di = 0; di < docs.length; di++) {
-          const m = measurements[di];
-          const cardX = cx + CELL_PAD;
-          const cardY = curY + CELL_PAD + cardOffsetY;
-          const style = evaluateCardStyle(docs[di], this.cardStyleFn);
-          this.cards.push({
-            doc: docs[di],
-            rect: { x: cardX, y: cardY, w: cardW, h: m.height },
-            style,
-            colorBarColor: style.color || getDocumentColor(docs[di].name),
-            isRange: false,
-            isVertical: false,
-            textLines: m.lines
-          });
-          cardOffsetY += m.height + CARD_GAP;
-        }
+        this.placeDots(docs, cx + cellW / 2, curY + rowH / 2);
         curY += rowH + GAP;
       }
       this.totalW = originX + Y_HEADER_W + GAP + cellW + GAP;
@@ -3343,7 +3489,7 @@ var CanvasRenderer = class extends import_obsidian5.MarkdownRenderChild {
         this.addSingleAxisRangeCards(rangeDocs, axisValues, "y");
       }
     } else {
-      const cellW = Math.max(MIN_CELL_W, 180);
+      const cellW = Math.max(MIN_CELL_W, 160);
       const headerH = 44;
       let curY = originY;
       for (let i = 0; i < axisValues.length; i++) {
@@ -3355,19 +3501,11 @@ var CanvasRenderer = class extends import_obsidian5.MarkdownRenderChild {
         });
       }
       curY += headerH + GAP;
-      const cardW = cellW - CELL_PAD * 2;
-      const axisMeasurements = [];
-      let maxContentH = 0;
+      let maxClusterH = 0;
       for (let i = 0; i < axisValues.length; i++) {
-        const measurements = axisDocs[i].map((doc) => this.measureCard(doc.name, cardW));
-        axisMeasurements[i] = measurements;
-        if (measurements.length > 0) {
-          const totalCardH = measurements.reduce((sum, m) => sum + m.height, 0);
-          const totalGap = (measurements.length - 1) * CARD_GAP;
-          maxContentH = Math.max(maxContentH, totalCardH + totalGap + CELL_PAD * 2);
-        }
+        maxClusterH = Math.max(maxClusterH, this.dotClusterHeight(axisDocs[i].length));
       }
-      const rowH = Math.max(120, maxContentH);
+      const rowH = Math.max(120, maxClusterH + CELL_PAD * 2);
       for (let i = 0; i < axisValues.length; i++) {
         const cx = originX + i * (cellW + GAP);
         const cellRect = { x: cx, y: curY, w: cellW, h: rowH };
@@ -3378,25 +3516,7 @@ var CanvasRenderer = class extends import_obsidian5.MarkdownRenderChild {
           xIdx: i,
           yIdx: -1
         });
-        const docs = axisDocs[i];
-        const measurements = axisMeasurements[i];
-        let cardOffsetY = 0;
-        for (let di = 0; di < docs.length; di++) {
-          const m = measurements[di];
-          const cardX = cx + CELL_PAD;
-          const cardY = curY + CELL_PAD + cardOffsetY;
-          const style = evaluateCardStyle(docs[di], this.cardStyleFn);
-          this.cards.push({
-            doc: docs[di],
-            rect: { x: cardX, y: cardY, w: cardW, h: m.height },
-            style,
-            colorBarColor: style.color || getDocumentColor(docs[di].name),
-            isRange: false,
-            isVertical: false,
-            textLines: m.lines
-          });
-          cardOffsetY += m.height + CARD_GAP;
-        }
+        this.placeDots(axisDocs[i], cx + cellW / 2, curY + rowH / 2);
       }
       curY += rowH + GAP;
       this.totalW = originX + axisValues.length * (cellW + GAP) + GAP;
@@ -3460,10 +3580,8 @@ var CanvasRenderer = class extends import_obsidian5.MarkdownRenderChild {
       const rawEnd = getPropertyValue(layout.doc.properties, axisEndProperty);
       const displayStart = applyTransform(rawStart, transformFn);
       const displayEnd = applyTransform(rawEnd, transformFn);
-      console.warn("Hermione single-axis range:", { doc: layout.doc.name, rawStart, rawEnd, displayStart, displayEnd, axisProperty, axisEndProperty, axis });
       const p1 = this.interpolatePosition(parseFloat(String(displayStart)), axisValues, axis);
       const p2 = this.interpolatePosition(parseFloat(String(displayEnd)), axisValues, axis);
-      console.warn("Hermione single-axis interp results:", { p1, p2 });
       if (axis === "x") {
         const interpLeft = p1 !== null && p2 !== null ? Math.min(p1, p2) : startCell.rect.x;
         const interpRight = p1 !== null && p2 !== null ? Math.max(p1, p2) : endCell.rect.x + endCell.rect.w;
@@ -3557,12 +3675,15 @@ var CanvasRenderer = class extends import_obsidian5.MarkdownRenderChild {
       ctx.textBaseline = "middle";
       this.drawTruncatedText(h.label, h.rect.x + h.rect.w - HEADER_PAD, h.rect.y + h.rect.h / 2, h.rect.w - HEADER_PAD * 2);
     }
+    for (const g of this.dotGroups) {
+      this.drawGroupCircle(g.cx, g.cy, g.r);
+    }
     for (const card of this.cards) {
       if (card.isRange)
         continue;
       if (((_b = this.dragState) == null ? void 0 : _b.dragging) && this.dragState.card === card)
         continue;
-      this.drawCard(card);
+      this.drawDot(card);
     }
     for (const card of this.cards) {
       if (!card.isRange)
@@ -3587,7 +3708,7 @@ var CanvasRenderer = class extends import_obsidian5.MarkdownRenderChild {
           h: card.rect.h
         }
       };
-      this.drawCard(ghostCard);
+      this.drawDot(ghostCard);
       ctx.restore();
     }
   }
@@ -3645,6 +3766,108 @@ var CanvasRenderer = class extends import_obsidian5.MarkdownRenderChild {
       this.drawRoundRectPartial(card.rect.x, card.rect.y + card.rect.h - HANDLE_SIZE, card.rect.w, HANDLE_SIZE, CARD_RADIUS, false, false, true, true);
     }
     ctx.globalAlpha = 1;
+  }
+  // ── Dot Mode Helpers ─────────────────────────────────────────────
+  /** Returns {dx,dy} offsets from center for n dots arranged in a compact grid. */
+  arrangeDots(n) {
+    if (n === 1)
+      return [{ dx: 0, dy: 0 }];
+    const cols = Math.ceil(Math.sqrt(n));
+    const rows = Math.ceil(n / cols);
+    const offsets = [];
+    for (let i = 0; i < n; i++) {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const rowDotCount = row === rows - 1 ? n - row * cols : cols;
+      const rowShift = (cols - rowDotCount) / 2 * DOT_SPACING;
+      const dx = (col - (cols - 1) / 2) * DOT_SPACING + (row === rows - 1 ? rowShift : 0);
+      const dy = (row - (rows - 1) / 2) * DOT_SPACING;
+      offsets.push({ dx, dy });
+    }
+    return offsets;
+  }
+  /** Radius of the group background circle for n dots. */
+  computeGroupRadius(n) {
+    const cols = Math.ceil(Math.sqrt(n));
+    const rows = Math.ceil(n / cols);
+    const halfW = (cols - 1) / 2 * DOT_SPACING + DOT_RADIUS;
+    const halfH = (rows - 1) / 2 * DOT_SPACING + DOT_RADIUS;
+    return Math.sqrt(halfW * halfW + halfH * halfH) + GROUP_BG_PAD;
+  }
+  /** Pixel height needed for a cluster of n dots. */
+  dotClusterHeight(n) {
+    if (n <= 1)
+      return DOT_RADIUS * 2;
+    const cols = Math.ceil(Math.sqrt(n));
+    const rows = Math.ceil(n / cols);
+    return DOT_RADIUS * 2 + (rows - 1) * DOT_SPACING;
+  }
+  /** Creates CardInfos for point docs, centered at (cx, cy). Registers group if n > 1. */
+  placeDots(docs, cx, cy) {
+    if (docs.length === 0)
+      return;
+    const offsets = this.arrangeDots(docs.length);
+    for (let i = 0; i < docs.length; i++) {
+      const dotCX = cx + offsets[i].dx;
+      const dotCY = cy + offsets[i].dy;
+      const style = evaluateCardStyle(docs[i], this.cardStyleFn);
+      this.cards.push({
+        doc: docs[i],
+        rect: { x: dotCX - DOT_RADIUS, y: dotCY - DOT_RADIUS, w: DOT_RADIUS * 2, h: DOT_RADIUS * 2 },
+        style,
+        colorBarColor: style.color || getDocumentColor(docs[i].name),
+        isRange: false,
+        isVertical: false,
+        textLines: []
+      });
+    }
+    if (docs.length > 1) {
+      this.dotGroups.push({ cx, cy, r: this.computeGroupRadius(docs.length) });
+    }
+  }
+  drawDot(card) {
+    const ctx = this.ctx;
+    const cx = card.rect.x + DOT_RADIUS;
+    const cy = card.rect.y + DOT_RADIUS;
+    const isHovered = this.hoveredCard === card;
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.2)";
+    ctx.shadowBlur = isHovered ? 14 : 5;
+    ctx.shadowOffsetY = isHovered ? 3 : 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, DOT_RADIUS, 0, Math.PI * 2);
+    ctx.fillStyle = card.style.background || card.colorBarColor;
+    ctx.fill();
+    ctx.restore();
+    ctx.beginPath();
+    ctx.arc(cx, cy, DOT_RADIUS, 0, Math.PI * 2);
+    if (isHovered) {
+      ctx.strokeStyle = this.colors.accent;
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+    } else if (card.style.border) {
+      ctx.strokeStyle = card.style.border;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+  }
+  drawGroupCircle(cx, cy, r) {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha = GROUP_BG_ALPHA;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = this.colors.accent;
+    ctx.fill();
+    ctx.restore();
+  }
+  pointInDot(px, py, card) {
+    const cx = card.rect.x + DOT_RADIUS;
+    const cy = card.rect.y + DOT_RADIUS;
+    const dx = px - cx;
+    const dy = py - cy;
+    const hitR = DOT_RADIUS + 3;
+    return dx * dx + dy * dy <= hitR * hitR;
   }
   // ── Drawing Helpers ──────────────────────────────────────────────
   traceRoundRect(x, y, w, h, r) {
@@ -3763,7 +3986,8 @@ var CanvasRenderer = class extends import_obsidian5.MarkdownRenderChild {
     }
     for (let i = this.cards.length - 1; i >= 0; i--) {
       const card = this.cards[i];
-      if (this.pointInRect(lx, ly, card.rect)) {
+      const hit = card.isRange ? this.pointInRect(lx, ly, card.rect) : this.pointInDot(lx, ly, card);
+      if (hit) {
         return { type: "card", card };
       }
     }
@@ -3950,7 +4174,7 @@ var CanvasRenderer = class extends import_obsidian5.MarkdownRenderChild {
         new import_obsidian5.Component()
       );
     } catch (e) {
-      content.createSpan({ text: "Vorschau nicht verf\xFCgbar", cls: "hermione-preview-error" });
+      content.createSpan({ text: t().renderer.previewUnavailable, cls: "hermione-preview-error" });
     }
   }
   showPreviewAxes(content, doc) {
@@ -4043,7 +4267,7 @@ var CanvasRenderer = class extends import_obsidian5.MarkdownRenderChild {
     if (unassigned.length === 0)
       return;
     const section = this.containerEl.createDiv({ cls: "hermione-unassigned" });
-    section.createEl("strong", { text: "Nicht zugeordnet:" });
+    section.createEl("strong", { text: t().renderer.unassigned });
     const items = section.createDiv({ cls: "hermione-unassigned-items" });
     for (const doc of unassigned) {
       const card = items.createDiv({ cls: "hermione-card" });
@@ -4066,7 +4290,7 @@ var CanvasRenderer = class extends import_obsidian5.MarkdownRenderChild {
     const zoomControls = toolbar.createDiv({ cls: "hermione-zoom-controls" });
     const zoomOutBtn = zoomControls.createEl("button", { cls: "hermione-zoom-btn" });
     (0, import_obsidian5.setIcon)(zoomOutBtn, "minus");
-    zoomOutBtn.title = "Verkleinern";
+    zoomOutBtn.title = t().renderer.zoomOut;
     zoomOutBtn.addEventListener("click", () => {
       if (this.zoomLevel > ZOOM_MIN) {
         this.zoomLevel -= ZOOM_STEP;
@@ -4079,7 +4303,7 @@ var CanvasRenderer = class extends import_obsidian5.MarkdownRenderChild {
       cls: "hermione-zoom-display",
       text: `${this.zoomLevel}%`
     });
-    this.zoomDisplay.title = "Zoom zur\xFCcksetzen";
+    this.zoomDisplay.title = t().renderer.zoomReset;
     this.zoomDisplay.addEventListener("click", () => {
       this.zoomLevel = 100;
       this.applyCanvasSize();
@@ -4088,7 +4312,7 @@ var CanvasRenderer = class extends import_obsidian5.MarkdownRenderChild {
     });
     const zoomInBtn = zoomControls.createEl("button", { cls: "hermione-zoom-btn" });
     (0, import_obsidian5.setIcon)(zoomInBtn, "plus");
-    zoomInBtn.title = "Vergr\xF6\xDFern";
+    zoomInBtn.title = t().renderer.zoomIn;
     zoomInBtn.addEventListener("click", () => {
       if (this.zoomLevel < ZOOM_MAX) {
         this.zoomLevel += ZOOM_STEP;
@@ -4102,14 +4326,14 @@ var CanvasRenderer = class extends import_obsidian5.MarkdownRenderChild {
     slider.max = String(ZOOM_MAX);
     slider.step = String(ZOOM_STEP);
     slider.value = String(this.zoomLevel);
-    slider.title = "Zoom";
+    slider.title = t().renderer.zoomSlider;
     slider.addEventListener("input", (e) => {
       this.zoomLevel = parseInt(e.target.value);
       this.applyCanvasSize();
       this.draw();
       this.updateZoomDisplay();
     });
-    const refreshBtn = toolbar.createEl("button", { cls: "hermione-refresh-btn", text: "Aktualisieren" });
+    const refreshBtn = toolbar.createEl("button", { cls: "hermione-refresh-btn", text: t().renderer.refreshBtn });
     (0, import_obsidian5.setIcon)(refreshBtn, "refresh-cw");
     refreshBtn.addEventListener("click", () => this.onRefresh());
   }
@@ -4122,16 +4346,693 @@ var CanvasRenderer = class extends import_obsidian5.MarkdownRenderChild {
   }
 };
 
+// src/hermione-view.ts
+var import_obsidian6 = require("obsidian");
+var HERMIONE_VIEW_TYPE = "hermione-view";
+var HermioneView = class extends import_obsidian6.TextFileView {
+  constructor(leaf, plugin) {
+    super(leaf);
+    this.plugin = plugin;
+    this.isEditMode = false;
+    // Renderer state
+    this.currentRenderer = null;
+    this.currentData = "";
+    this.queryEngine = new QueryEngine(this.app);
+  }
+  getViewType() {
+    return HERMIONE_VIEW_TYPE;
+  }
+  getDisplayText() {
+    var _a, _b;
+    return (_b = (_a = this.file) == null ? void 0 : _a.basename) != null ? _b : "Hermione";
+  }
+  getIcon() {
+    return "grid-3x3";
+  }
+  async onOpen() {
+    var _a, _b;
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass("hermione-dedicated-view");
+    this.toolbar = contentEl.createDiv({ cls: "hermione-view-toolbar" });
+    this.toggleBtn = this.toolbar.createEl("button", { cls: "hermione-view-btn", attr: { "aria-label": t().view.edit } });
+    (0, import_obsidian6.setIcon)(this.toggleBtn, "pencil");
+    this.toggleBtn.addEventListener("click", () => this.toggleMode());
+    const refreshBtn = this.toolbar.createEl("button", { cls: "hermione-view-btn", attr: { "aria-label": t().view.refresh } });
+    (0, import_obsidian6.setIcon)(refreshBtn, "refresh-cw");
+    refreshBtn.addEventListener("click", () => this.renderVisualization());
+    this.titleEl = this.toolbar.createDiv({ cls: "hermione-view-toolbar-title", text: (_b = (_a = this.file) == null ? void 0 : _a.basename) != null ? _b : "Hermione", attr: { title: t().view.renameTitle } });
+    this.titleEl.addEventListener("click", () => this.startRename());
+    this.editorContainer = contentEl.createDiv({ cls: "hermione-view-editor" });
+    this.editorContainer.hide();
+    this.textArea = this.editorContainer.createEl("textarea", {
+      attr: { spellcheck: "false" }
+    });
+    this.viewContainer = contentEl.createDiv({ cls: "hermione-view-content" });
+  }
+  async onClose() {
+    this.cleanupRenderer();
+  }
+  getViewData() {
+    return this.currentData;
+  }
+  setViewData(data, _clear) {
+    var _a, _b;
+    this.currentData = data;
+    if (this.isEditMode) {
+      this.textArea.value = data;
+    } else {
+      this.renderVisualization();
+    }
+    if (this.titleEl)
+      this.titleEl.textContent = (_b = (_a = this.file) == null ? void 0 : _a.basename) != null ? _b : "Hermione";
+  }
+  clear() {
+    this.currentData = "";
+    this.cleanupRenderer();
+    if (this.viewContainer)
+      this.viewContainer.empty();
+    if (this.textArea)
+      this.textArea.value = "";
+  }
+  toggleMode() {
+    this.isEditMode = !this.isEditMode;
+    if (this.isEditMode) {
+      this.textArea.value = this.currentData;
+      this.editorContainer.show();
+      this.viewContainer.hide();
+      this.textArea.focus();
+      (0, import_obsidian6.setIcon)(this.toggleBtn, "eye");
+      this.toggleBtn.setAttribute("aria-label", t().view.preview);
+    } else {
+      const newData = this.textArea.value;
+      if (newData !== this.currentData) {
+        this.currentData = newData;
+        this.requestSave();
+      }
+      this.editorContainer.hide();
+      this.viewContainer.show();
+      (0, import_obsidian6.setIcon)(this.toggleBtn, "pencil");
+      this.toggleBtn.setAttribute("aria-label", t().view.edit);
+      this.renderVisualization();
+    }
+  }
+  startRename() {
+    if (!this.file)
+      return;
+    const currentName = this.file.basename;
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = currentName;
+    input.className = "hermione-view-rename-input";
+    this.titleEl.empty();
+    this.titleEl.appendChild(input);
+    input.focus();
+    input.select();
+    const commit = async () => {
+      const newName = input.value.trim();
+      if (!newName || newName === currentName) {
+        this.titleEl.textContent = currentName;
+        return;
+      }
+      const newPath = this.file.path.replace(/[^/\\]+\.hermione$/, `${newName}.hermione`);
+      try {
+        await this.app.fileManager.renameFile(this.file, newPath);
+      } catch (e) {
+        new import_obsidian6.Notice(t().view.renameError(e.message));
+        this.titleEl.textContent = currentName;
+      }
+    };
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        input.blur();
+      }
+      if (e.key === "Escape") {
+        this.titleEl.textContent = currentName;
+      }
+    });
+    input.addEventListener("blur", commit);
+  }
+  cleanupRenderer() {
+    if (this.currentRenderer) {
+      this.currentRenderer.unload();
+      this.currentRenderer = null;
+    }
+  }
+  async renderVisualization() {
+    this.cleanupRenderer();
+    this.viewContainer.empty();
+    if (!this.currentData.trim()) {
+      this.viewContainer.createDiv({
+        cls: "hermione-empty",
+        text: t().view.empty
+      });
+      return;
+    }
+    try {
+      const config = parseHermioneBlock(this.currentData);
+      if (!config.sort && (config.xAxis || config.yAxis)) {
+        config.sort = {
+          by: config.xAxis || config.yAxis,
+          order: this.plugin.settings.defaultSort
+        };
+      }
+      const result = await this.queryEngine.execute(config);
+      const RendererClass = config.renderer === "canvas" ? CanvasRenderer : MatrixRenderer;
+      const refresh = async () => {
+        const newResult = await this.queryEngine.execute(config);
+        this.viewContainer.empty();
+        this.currentRenderer = new RendererClass(this.viewContainer, this.app, config, newResult, refresh);
+        this.currentRenderer.load();
+      };
+      this.currentRenderer = new RendererClass(this.viewContainer, this.app, config, result, refresh);
+      this.currentRenderer.load();
+    } catch (error) {
+      this.viewContainer.createDiv({
+        cls: "hermione-error",
+        text: t().renderer.error(error.message)
+      });
+    }
+  }
+};
+
+// src/topic.ts
+var import_obsidian7 = require("obsidian");
+var VALUE_KEYS = ["wert", "value"];
+var CARD_STYLE_KEYS = ["card-style", "karten-stil", "cardstyle", "style", "stil"];
+var MAX_MARKS = 200;
+var MAX_LABELS = 10;
+var DOT_SIZE = 12;
+var DOT_GAP2 = 4;
+var DRAG_THRESHOLD2 = 3;
+function parseNumber(key, raw) {
+  const num = parseFloat(raw.replace(",", "."));
+  if (isNaN(num))
+    throw new Error(t().topic.notANumber(key, raw));
+  return num;
+}
+function parseTopicBlock(content) {
+  const config = { scale: "direct" };
+  const lines = content.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("//"))
+      continue;
+    const colonIndex = trimmed.indexOf(":");
+    if (colonIndex === -1)
+      continue;
+    const key = trimmed.substring(0, colonIndex).trim().toLowerCase();
+    let value = trimmed.substring(colonIndex + 1).trim();
+    if (CARD_STYLE_KEYS.includes(key)) {
+      while (i + 1 < lines.length && unclosedBraces(value) > 0) {
+        value += "\n" + lines[++i];
+      }
+    }
+    switch (key) {
+      case "title":
+      case "titel":
+      case "\xFCberschrift":
+        config.title = value;
+        break;
+      case "description":
+      case "beschreibung":
+      case "desc":
+        config.description = value;
+        break;
+      case "scale":
+      case "skala": {
+        const v = value.toLowerCase();
+        if (v !== "direkt" && v !== "direct")
+          throw new Error(t().topic.unknownScale(value));
+        config.scale = "direct";
+        break;
+      }
+      case "min":
+      case "minimum":
+        config.min = parseNumber(key, value);
+        break;
+      case "max":
+      case "maximum":
+        config.max = parseNumber(key, value);
+        break;
+      case "steps":
+      case "schritte":
+      case "zwischenschritte": {
+        const steps = parseNumber(key, value);
+        if (!Number.isInteger(steps) || steps < 1)
+          throw new Error(t().topic.invalidSteps(value));
+        config.steps = steps;
+        break;
+      }
+      case "wert":
+      case "value":
+        if (value)
+          config.value = parseNumber(key, value);
+        break;
+      case "source":
+      case "from":
+      case "quelle":
+        config.source = value;
+        break;
+      case "x":
+      case "x-axis":
+      case "x-achse":
+      case "xaxis":
+        config.xAxis = value;
+        break;
+      case "card-style":
+      case "karten-stil":
+      case "cardstyle":
+      case "style":
+      case "stil":
+        config.cardStyle = value;
+        break;
+      case "exakt":
+      case "exact":
+        config.exact = value.toLowerCase() === "true" || value.toLowerCase() === "ja";
+        break;
+    }
+  }
+  if (config.min === void 0)
+    throw new Error(t().topic.minRequired);
+  if (config.max === void 0)
+    throw new Error(t().topic.maxRequired);
+  if (config.min >= config.max)
+    throw new Error(t().topic.minGreaterMax);
+  if (config.source && !config.xAxis)
+    throw new Error(t().topic.xAxisRequired);
+  return config;
+}
+function evaluateDotStyle(doc, fn) {
+  var _a, _b, _c, _d, _e, _f;
+  if (!fn)
+    return {};
+  try {
+    const result = fn(doc.properties);
+    if (!result)
+      return {};
+    if (typeof result === "string")
+      return { color: result };
+    if (typeof result === "object") {
+      const size = Number((_b = (_a = result.size) != null ? _a : result.gr\u00F6\u00DFe) != null ? _b : result.groesse);
+      return {
+        color: (_e = (_d = (_c = result.color) != null ? _c : result.farbe) != null ? _d : result.background) != null ? _e : result.hintergrund,
+        border: (_f = result.border) != null ? _f : result.rahmen,
+        size: size > 0 ? size : void 0
+      };
+    }
+  } catch (e) {
+    console.error("Hermione: card-style evaluation error for", doc.name, e);
+  }
+  return {};
+}
+function clean(num) {
+  return Math.round(num * 1e9) / 1e9;
+}
+var TopicRenderer = class extends import_obsidian7.MarkdownRenderChild {
+  constructor(containerEl, app, config, ctx, source) {
+    super(containerEl);
+    this.app = app;
+    this.config = config;
+    this.ctx = ctx;
+    this.source = source;
+    /** True while a document circle is being dragged */
+    this.dragging = false;
+    /** Layout requested during a drag; executed once the drag ends */
+    this.pendingLayout = null;
+  }
+  onload() {
+    this.render();
+  }
+  get stepSize() {
+    const { min, max, steps } = this.config;
+    return steps ? (max - min) / steps : void 0;
+  }
+  /** Snap a value onto the scale and clamp it to [min, max] */
+  snap(num) {
+    const { min, max } = this.config;
+    const step = this.stepSize;
+    let v = Math.min(max, Math.max(min, num));
+    if (step)
+      v = min + Math.round((v - min) / step) * step;
+    return clean(v);
+  }
+  render() {
+    var _a;
+    const { config } = this;
+    const el = this.containerEl;
+    el.empty();
+    const container = el.createDiv({ cls: "hermione-topic" });
+    if (config.title)
+      container.createEl("h4", { cls: "hermione-title", text: config.title });
+    if (config.description)
+      container.createEl("p", { cls: "hermione-description", text: config.description });
+    const grid = container.createDiv({ cls: "hermione-topic-grid" });
+    const slider = grid.createEl("input", { cls: "hermione-topic-slider", type: "range" });
+    slider.min = String(config.min);
+    slider.max = String(config.max);
+    slider.step = this.stepSize ? String(this.stepSize) : "any";
+    const valueEl = grid.createSpan({ cls: "hermione-topic-value" });
+    const initial = this.snap((_a = config.value) != null ? _a : config.min);
+    slider.value = String(initial);
+    valueEl.setText(String(initial));
+    const marks = grid.createDiv({ cls: "hermione-topic-marks" });
+    const labels = grid.createDiv({ cls: "hermione-topic-labels" });
+    const addLabel = (fraction, text) => {
+      labels.createSpan({ cls: "hermione-topic-label", text }).style.left = `${fraction * 100}%`;
+    };
+    const { steps } = config;
+    if (steps && steps <= MAX_MARKS) {
+      const labelEvery = Math.ceil(steps / MAX_LABELS);
+      for (let i = 0; i <= steps; i++) {
+        const major = i % labelEvery === 0 || i === steps;
+        const mark = marks.createSpan({ cls: major ? "hermione-topic-mark is-major" : "hermione-topic-mark" });
+        mark.style.left = `${i / steps * 100}%`;
+        if (major)
+          addLabel(i / steps, String(clean(config.min + i * this.stepSize)));
+      }
+    } else {
+      for (const fraction of [0, 1]) {
+        marks.createSpan({ cls: "hermione-topic-mark is-major" }).style.left = `${fraction * 100}%`;
+      }
+      addLabel(0, String(config.min));
+      addLabel(1, String(config.max));
+    }
+    if (config.source && config.xAxis) {
+      this.setupDocuments(
+        grid.createDiv({ cls: "hermione-topic-docs" }),
+        grid.createDiv({ cls: "hermione-topic-docs-info" })
+      );
+    }
+    if (config.source && config.xAxis) {
+      this.registerDomEvent(slider, "dblclick", (evt) => {
+        if (!this.isOnThumb(slider, evt.clientX))
+          return;
+        void this.createDocument(this.snap(parseFloat(slider.value)));
+      });
+    }
+    this.registerDomEvent(slider, "input", () => {
+      valueEl.setText(String(this.snap(parseFloat(slider.value))));
+    });
+    this.registerDomEvent(slider, "change", () => {
+      const v = this.snap(parseFloat(slider.value));
+      config.value = v;
+      void this.persistValue(v);
+    });
+  }
+  // ── Documents below the scale ────────────────────────────────────
+  /** Query documents, draw them and keep them up to date */
+  setupDocuments(dotsEl, infoEl) {
+    const engine = new QueryEngine(this.app);
+    const styleFn = this.config.cardStyle ? compileTransform(this.config.cardStyle) : null;
+    let docs = [];
+    const load = async () => {
+      const { min, max, source, xAxis } = this.config;
+      let notNumeric = 0;
+      let outOfRange = 0;
+      docs = [];
+      for (const file of engine.getSourceFiles(source)) {
+        const doc = await engine.getDocumentData(file);
+        if (!doc)
+          continue;
+        const raw = engine.getPropertyValue(doc.properties, xAxis);
+        if (raw === void 0 || raw === null || raw === "")
+          continue;
+        if (typeof raw !== "number" || isNaN(raw)) {
+          notNumeric++;
+          continue;
+        }
+        if (raw < min || raw > max) {
+          outOfRange++;
+          continue;
+        }
+        docs.push({ doc, value: raw, style: evaluateDotStyle(doc, styleFn) });
+      }
+      infoEl.empty();
+      if (notNumeric)
+        infoEl.createDiv({ text: t().topic.notNumeric(notNumeric, xAxis) });
+      if (outOfRange)
+        infoEl.createDiv({ text: t().topic.outOfRange(outOfRange) });
+      layout();
+    };
+    const layout = () => {
+      if (this.dragging) {
+        this.pendingLayout = layout;
+        return;
+      }
+      this.layoutDocuments(dotsEl, docs);
+    };
+    const observer = new ResizeObserver((0, import_obsidian7.debounce)(layout, 50, true));
+    observer.observe(dotsEl);
+    this.register(() => observer.disconnect());
+    const reload = (0, import_obsidian7.debounce)(() => void load(), 300, true);
+    this.registerEvent(this.app.metadataCache.on("changed", reload));
+    this.registerEvent(this.app.vault.on("rename", reload));
+    this.registerEvent(this.app.vault.on("delete", reload));
+    void load();
+  }
+  /**
+   * Place each document as a circle at the exact position of its value.
+   * Documents are processed from left to right; each goes into the topmost
+   * row where it does not overlap the previous circle of that row.
+   * All rows share the height of the largest circle.
+   */
+  layoutDocuments(dotsEl, docs) {
+    var _a;
+    const { min, max } = this.config;
+    const width = dotsEl.clientWidth;
+    dotsEl.empty();
+    const sorted = [...docs].sort((a, b) => a.value - b.value || a.doc.name.localeCompare(b.doc.name));
+    const rowHeight = Math.max(DOT_SIZE, ...sorted.map((d) => {
+      var _a2;
+      return (_a2 = d.style.size) != null ? _a2 : DOT_SIZE;
+    })) + DOT_GAP2;
+    const rowEnds = [];
+    for (const { doc, value, style } of sorted) {
+      const size = (_a = style.size) != null ? _a : DOT_SIZE;
+      const fraction = (value - min) / (max - min);
+      const left = fraction * width - size / 2;
+      let row = rowEnds.findIndex((end) => left - end >= DOT_GAP2);
+      if (row === -1)
+        row = rowEnds.length;
+      rowEnds[row] = left + size;
+      const dot = dotsEl.createDiv({ cls: "hermione-topic-doc" });
+      dot.style.left = `${fraction * 100}%`;
+      dot.style.top = `${row * rowHeight + (rowHeight - DOT_GAP2 - size) / 2}px`;
+      if (style.size) {
+        dot.style.width = `${size}px`;
+        dot.style.height = `${size}px`;
+      }
+      if (style.color)
+        dot.style.backgroundColor = style.color;
+      if (style.border)
+        dot.style.boxShadow = `inset 0 0 0 2px ${style.border}`;
+      (0, import_obsidian7.setTooltip)(dot, t().topic.docTooltip(doc.name, value));
+      this.makeDraggable(dot, dotsEl, doc, value);
+    }
+    dotsEl.style.height = `${rowEnds.length * rowHeight}px`;
+  }
+  /**
+   * Drag a circle horizontally within the scale to set the document's value.
+   * A click without movement opens the document instead.
+   * Listeners are attached directly: the dot is discarded on the next layout.
+   */
+  makeDraggable(dot, dotsEl, doc, original) {
+    const { min, max } = this.config;
+    let startX = 0;
+    let moved = false;
+    let current = original;
+    let badge = null;
+    const valueAt = (clientX) => {
+      const rect = dotsEl.getBoundingClientRect();
+      const fraction = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+      const raw = min + fraction * (max - min);
+      return this.config.exact ? this.roundExact(raw) : this.snap(raw);
+    };
+    dot.addEventListener("pointerdown", (evt) => {
+      if (evt.button !== 0)
+        return;
+      evt.preventDefault();
+      dot.setPointerCapture(evt.pointerId);
+      startX = evt.clientX;
+      moved = false;
+      current = original;
+    });
+    dot.addEventListener("pointermove", (evt) => {
+      if (!dot.hasPointerCapture(evt.pointerId))
+        return;
+      if (!moved && Math.abs(evt.clientX - startX) < DRAG_THRESHOLD2)
+        return;
+      if (!moved) {
+        moved = true;
+        this.dragging = true;
+        dot.addClass("is-dragging");
+        badge = dot.createSpan({ cls: "hermione-topic-doc-badge" });
+      }
+      current = valueAt(evt.clientX);
+      dot.style.left = `${(current - min) / (max - min) * 100}%`;
+      badge.setText(String(current));
+    });
+    const finish = async (evt, cancelled) => {
+      if (dot.hasPointerCapture(evt.pointerId))
+        dot.releasePointerCapture(evt.pointerId);
+      if (!moved) {
+        if (!cancelled) {
+          this.app.workspace.openLinkText(doc.path, this.ctx.sourcePath, evt.ctrlKey || evt.metaKey);
+        }
+        return;
+      }
+      dot.removeClass("is-dragging");
+      badge == null ? void 0 : badge.remove();
+      badge = null;
+      this.dragging = false;
+      if (!cancelled && current !== original) {
+        await this.app.fileManager.processFrontMatter(doc.file, (fm) => {
+          fm[this.config.xAxis] = current;
+        });
+      } else {
+        dot.style.left = `${(original - min) / (max - min) * 100}%`;
+      }
+      const pending = this.pendingLayout;
+      this.pendingLayout = null;
+      pending == null ? void 0 : pending();
+    };
+    dot.addEventListener("pointerup", (evt) => void finish(evt, false));
+    dot.addEventListener("pointercancel", (evt) => void finish(evt, true));
+  }
+  /** Round an unsnapped value to a precision that fits the scale range */
+  roundExact(num) {
+    const { min, max } = this.config;
+    const decimals = Math.max(0, Math.ceil(-Math.log10((max - min) / 100)));
+    return clean(Number(num.toFixed(decimals)));
+  }
+  /**
+   * Whether clientX lies on the slider thumb. The thumb centre moves from
+   * half a thumb width at min to (width - half a thumb width) at max.
+   */
+  isOnThumb(slider, clientX) {
+    const { min, max } = this.config;
+    const rect = slider.getBoundingClientRect();
+    const thumb = parseFloat(getComputedStyle(slider).getPropertyValue("--slider-thumb-width")) || 18;
+    const fraction = (parseFloat(slider.value) - min) / (max - min);
+    const centre = rect.left + thumb / 2 + fraction * (rect.width - thumb);
+    return Math.abs(clientX - centre) <= thumb / 2 + 2;
+  }
+  /**
+   * Create "<Dokument>-<n>.md" (first free n) in the source folder with the
+   * scale property set to the given value. The document is not opened;
+   * the change listener picks it up and draws its circle.
+   */
+  async createDocument(value) {
+    const source = this.config.source.replace(/^"(.*)"$/, "$1");
+    const folder = this.app.vault.getAbstractFileByPath((0, import_obsidian7.normalizePath)(source));
+    if (!(folder instanceof import_obsidian7.TFolder)) {
+      new import_obsidian7.Notice(t().topic.sourceNotFolder(source));
+      return;
+    }
+    const base = t().topic.newDocBaseName;
+    const prefix = folder.isRoot() ? "" : `${folder.path}/`;
+    let n = 1;
+    while (this.app.vault.getAbstractFileByPath(`${prefix}${base}-${n}.md`))
+      n++;
+    const file = await this.app.vault.create(`${prefix}${base}-${n}.md`, "");
+    await this.app.fileManager.processFrontMatter(file, (fm) => {
+      fm[this.config.xAxis] = value;
+    });
+    new import_obsidian7.Notice(t().topic.created(file.basename));
+  }
+  /** Write `wert: <value>` into the code block source */
+  async persistValue(value) {
+    const file = this.app.vault.getAbstractFileByPath(this.ctx.sourcePath);
+    if (!(file instanceof import_obsidian7.TFile))
+      return;
+    const info = this.ctx.getSectionInfo(this.containerEl);
+    await this.app.vault.process(file, (data) => {
+      const eol = data.includes("\r\n") ? "\r\n" : "\n";
+      const lines = data.split(/\r?\n/);
+      const block = this.findBlock(lines, info == null ? void 0 : info.lineStart);
+      if (!block) {
+        console.warn("Hermione: hermione-topic block not found, value not saved");
+        return data;
+      }
+      for (let i = block.start + 1; i < block.end; i++) {
+        const match = lines[i].match(/^(\s*)([^:]+):/);
+        if (match && VALUE_KEYS.includes(match[2].trim().toLowerCase())) {
+          lines[i] = `${match[1]}${match[2].trim()}: ${value}`;
+          return lines.join(eol);
+        }
+      }
+      lines.splice(block.end, 0, `wert: ${value}`);
+      return lines.join(eol);
+    });
+    this.source = this.source.replace(/^(\s*(?:wert|value)\s*:).*$/im, `$1 ${value}`);
+  }
+  /**
+   * Locate this block (opening/closing fence line indices).
+   * Prefers the position reported by Obsidian; falls back to matching the
+   * block content, then to the only hermione-topic block in the file.
+   */
+  findBlock(lines, hint) {
+    const blocks = [];
+    for (let i = 0; i < lines.length; i++) {
+      const open = lines[i].match(/^\s*(`{3,}|~{3,})\s*hermione-topic\s*$/);
+      if (!open)
+        continue;
+      const fence = open[1];
+      let end = i + 1;
+      while (end < lines.length && !lines[end].trim().startsWith(fence))
+        end++;
+      if (end >= lines.length)
+        break;
+      blocks.push({ start: i, end });
+      i = end;
+    }
+    const byHint = blocks.find((b) => b.start === hint);
+    if (byHint)
+      return byHint;
+    const normalize = (s) => s.split(/\r?\n/).map((l) => l.trim()).filter((l) => l).join("\n");
+    const wanted = normalize(this.source);
+    const byContent = blocks.filter((b) => normalize(lines.slice(b.start + 1, b.end).join("\n")) === wanted);
+    if (byContent.length === 1)
+      return byContent[0];
+    return blocks.length === 1 ? blocks[0] : null;
+  }
+};
+
 // src/main.ts
 var DEFAULT_SETTINGS = {
   refreshOnChange: true,
   defaultSort: "asc"
 };
-var HermionePlugin = class extends import_obsidian6.Plugin {
+var HermionePlugin = class extends import_obsidian8.Plugin {
   async onload() {
     await this.loadSettings();
     this.queryEngine = new QueryEngine(this.app);
     this.registerMarkdownCodeBlockProcessor("hermione", this.processHermioneBlock.bind(this));
+    this.registerMarkdownCodeBlockProcessor("hermione-topic", (source, el, ctx) => {
+      try {
+        ctx.addChild(new TopicRenderer(el, this.app, parseTopicBlock(source), ctx, source));
+      } catch (error) {
+        el.createDiv({ cls: "hermione-error", text: t().renderer.error(error.message) });
+      }
+    });
+    this.registerView(HERMIONE_VIEW_TYPE, (leaf) => new HermioneView(leaf, this));
+    this.registerExtensions(["hermione"], HERMIONE_VIEW_TYPE);
+    this.addRibbonIcon("grid-3x3", t().ribbon.createNew, async () => {
+      await this.createHermioneFile();
+    });
+    this.registerEvent(
+      this.app.workspace.on("file-menu", (menu, file) => {
+        if (file instanceof import_obsidian8.TFolder) {
+          menu.addItem((item) => {
+            item.setTitle(t().contextMenu.newView).setIcon("grid-3x3").onClick(async () => {
+              await this.createHermioneFile(file.path);
+            });
+          });
+        }
+      })
+    );
     this.addSettingTab(new HermioneSettingTab(this.app, this));
     console.log("Hermione plugin loaded");
   }
@@ -4143,6 +5044,21 @@ var HermionePlugin = class extends import_obsidian6.Plugin {
   }
   async saveSettings() {
     await this.saveData(this.settings);
+  }
+  async createHermioneFile(folderPath) {
+    var _a, _b;
+    const folder = (_b = folderPath != null ? folderPath : (_a = this.app.fileManager.getNewFileParent("")) == null ? void 0 : _a.path) != null ? _b : "";
+    const baseName = t().file.newViewBaseName;
+    const templateContent = t().file.templateContent;
+    let fileName = folder ? `${folder}/${baseName}.hermione` : `${baseName}.hermione`;
+    let counter = 1;
+    while (this.app.vault.getAbstractFileByPath(fileName)) {
+      fileName = folder ? `${folder}/${baseName} ${counter}.hermione` : `${baseName} ${counter}.hermione`;
+      counter++;
+    }
+    const file = await this.app.vault.create(fileName, templateContent);
+    const leaf = this.app.workspace.getLeaf(false);
+    await leaf.openFile(file);
   }
   /**
    * Process a hermione code block
@@ -4157,7 +5073,7 @@ var HermionePlugin = class extends import_obsidian6.Plugin {
         };
       }
       const result = await this.queryEngine.execute(config);
-      const RendererClass = config.renderer === "canvas" ? CanvasRenderer : MatrixRenderer;
+      const RendererClass = config.renderer === "html" ? MatrixRenderer : CanvasRenderer;
       const refresh = async () => {
         const newResult = await this.queryEngine.execute(config);
         el.empty();
@@ -4169,12 +5085,12 @@ var HermionePlugin = class extends import_obsidian6.Plugin {
     } catch (error) {
       el.createDiv({
         cls: "hermione-error",
-        text: `Hermione Error: ${error.message}`
+        text: t().renderer.error(error.message)
       });
     }
   }
 };
-var HermioneSettingTab = class extends import_obsidian6.PluginSettingTab {
+var HermioneSettingTab = class extends import_obsidian8.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -4182,16 +5098,16 @@ var HermioneSettingTab = class extends import_obsidian6.PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: "Hermione Einstellungen" });
-    new import_obsidian6.Setting(containerEl).setName("Automatisch aktualisieren").setDesc("Aktualisiert die Ansicht automatisch, wenn Dokumente ge\xE4ndert werden").addToggle((toggle) => toggle.setValue(this.plugin.settings.refreshOnChange).onChange(async (value) => {
+    containerEl.createEl("h2", { text: t().settings.heading });
+    new import_obsidian8.Setting(containerEl).setName(t().settings.autoRefreshName).setDesc(t().settings.autoRefreshDesc).addToggle((toggle) => toggle.setValue(this.plugin.settings.refreshOnChange).onChange(async (value) => {
       this.plugin.settings.refreshOnChange = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian6.Setting(containerEl).setName("Standard-Sortierung").setDesc("Standard-Sortierrichtung f\xFCr Abfragen").addDropdown((dropdown) => dropdown.addOption("asc", "Aufsteigend").addOption("desc", "Absteigend").setValue(this.plugin.settings.defaultSort).onChange(async (value) => {
+    new import_obsidian8.Setting(containerEl).setName(t().settings.defaultSortName).setDesc(t().settings.defaultSortDesc).addDropdown((dropdown) => dropdown.addOption("asc", t().settings.sortAsc).addOption("desc", t().settings.sortDesc).setValue(this.plugin.settings.defaultSort).onChange(async (value) => {
       this.plugin.settings.defaultSort = value;
       await this.plugin.saveSettings();
     }));
-    containerEl.createEl("h3", { text: "Verwendung" });
+    containerEl.createEl("h3", { text: t().settings.usageHeading });
     const usageEl = containerEl.createDiv({ cls: "hermione-settings-usage" });
     usageEl.innerHTML = `
       <p>Erstellen Sie einen Code-Block mit dem Typ <code>hermione</code>:</p>

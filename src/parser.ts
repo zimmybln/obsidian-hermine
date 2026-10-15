@@ -1,4 +1,5 @@
 import { HermioneConfig } from "./types";
+import { t } from "./i18n";
 
 /** Keys that accept JavaScript arrow functions (may span multiple lines) */
 const FUNCTION_KEYS = new Set([
@@ -12,7 +13,7 @@ const FUNCTION_KEYS = new Set([
  * Count unbalanced opening braces in a string.
  * Returns > 0 when there are more '{' than '}'.
  */
-function unclosedBraces(str: string): number {
+export function unclosedBraces(str: string): number {
   let depth = 0;
   for (const ch of str) {
     if (ch === "{") depth++;
@@ -102,6 +103,11 @@ export function parseHermioneBlock(content: string): HermioneConfig {
       case "titel":
       case "überschrift":
         config.title = value;
+        break;
+      case "description":
+      case "beschreibung":
+      case "desc":
+        config.description = value;
         break;
       case "source":
       case "from":
@@ -293,10 +299,10 @@ export function validateConfig(config: HermioneConfig): string[] {
   const errors: string[] = [];
 
   if (!config.source) {
-    errors.push("Source is required");
+    errors.push(t().parser.sourceRequired);
   }
   if (!config.xAxis) {
-    errors.push("X-Axis property is required");
+    errors.push(t().parser.xAxisRequired);
   }
 
   return errors;

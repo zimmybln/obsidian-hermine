@@ -1,4 +1,5 @@
 import { App, Modal } from "obsidian";
+import { t } from "./i18n";
 
 /**
  * Modal for entering an exact numeric value when dropping a card
@@ -23,12 +24,12 @@ export class ExactValueModal extends Modal {
     contentEl.addClass("hermione-exact-modal");
 
     contentEl.createEl("h3", {
-      text: `Exakter Wert für "${this.axisName}"`
+      text: t().exactValue.heading(this.axisName)
     });
 
     contentEl.createEl("p", {
       cls: "hermione-exact-info",
-      text: `Bereich: ${this.rangeMin} – ${this.rangeMax}`
+      text: t().exactValue.range(this.rangeMin, this.rangeMax)
     });
 
     // Input with range slider
@@ -68,15 +69,15 @@ export class ExactValueModal extends Modal {
     const updateValidation = () => {
       const num = parseFloat(input.value);
       if (isNaN(num)) {
-        validation.textContent = "Bitte eine Zahl eingeben";
+        validation.textContent = t().exactValue.enterNumber;
         validation.className = "hermione-exact-validation hermione-picker-invalid";
         confirmBtn.disabled = true;
       } else if (num < this.rangeMin || num > this.rangeMax) {
-        validation.textContent = `Wert muss zwischen ${this.rangeMin} und ${this.rangeMax} liegen`;
+        validation.textContent = t().exactValue.outOfRange(this.rangeMin, this.rangeMax);
         validation.className = "hermione-exact-validation hermione-picker-invalid";
         confirmBtn.disabled = true;
       } else {
-        validation.textContent = `Wert: ${num}`;
+        validation.textContent = t().exactValue.valueLabel(num);
         validation.className = "hermione-exact-validation hermione-picker-valid";
         confirmBtn.disabled = false;
       }
@@ -87,12 +88,12 @@ export class ExactValueModal extends Modal {
 
     const confirmBtn = buttonContainer.createEl("button", {
       cls: "hermione-picker-confirm mod-cta",
-      text: "Übernehmen"
+      text: t().exactValue.confirm
     });
 
     const cancelBtn = buttonContainer.createEl("button", {
       cls: "hermione-picker-cancel",
-      text: "Abbrechen"
+      text: t().exactValue.cancel
     });
 
     const confirm = () => {

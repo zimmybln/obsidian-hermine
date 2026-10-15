@@ -1,4 +1,5 @@
 import { App, TFile, MarkdownRenderChild, setIcon, MarkdownRenderer, Component } from "obsidian";
+import { t } from "./i18n";
 import { HermioneConfig, DocumentData, QueryResult } from "./types";
 import { FrontmatterUpdater } from "./frontmatter-updater";
 import { compileTransform, applyTransform, buildReverseMap } from "./value-transform";
@@ -103,6 +104,12 @@ export class MatrixRenderer extends MarkdownRenderChild {
         text: this.config.title
       });
     }
+    if (this.config.description) {
+      this.containerEl.createEl("p", {
+        cls: "hermione-description",
+        text: this.config.description
+      });
+    }
 
     // Show errors if any
     if (this.result.errors.length > 0) {
@@ -140,7 +147,7 @@ export class MatrixRenderer extends MarkdownRenderChild {
   private renderEmptyState(): void {
     this.containerEl.createDiv({
       cls: "hermione-empty",
-      text: "Keine Dokumente gefunden."
+      text: t().renderer.noDocuments
     });
   }
 
@@ -860,7 +867,7 @@ export class MatrixRenderer extends MarkdownRenderChild {
         new Component()
       );
     } catch (error) {
-      content.createSpan({ text: "Vorschau nicht verfügbar", cls: "hermione-preview-error" });
+      content.createSpan({ text: t().renderer.previewUnavailable, cls: "hermione-preview-error" });
     }
   }
 
@@ -1656,7 +1663,7 @@ export class MatrixRenderer extends MarkdownRenderChild {
     if (unassigned.length === 0) return;
 
     const section = this.containerEl.createDiv({ cls: "hermione-unassigned" });
-    section.createEl("strong", { text: "Nicht zugeordnet:" });
+    section.createEl("strong", { text: t().renderer.unassigned });
 
     const items = section.createDiv({ cls: "hermione-unassigned-items" });
 
@@ -1704,18 +1711,18 @@ export class MatrixRenderer extends MarkdownRenderChild {
     // Edit button
     const editBtn = wrapper.createEl("button", { cls: "hermione-edit-btn" });
     setIcon(editBtn, "pencil");
-    editBtn.title = "Bearbeiten";
+    editBtn.title = t().renderer.editTitle;
 
     // Save button (hidden by default)
     const saveBtn = wrapper.createEl("button", { cls: "hermione-save-btn" });
     setIcon(saveBtn, "check");
-    saveBtn.title = "Speichern";
+    saveBtn.title = t().renderer.saveTitle;
     saveBtn.style.display = "none";
 
     // Cancel button (hidden by default)
     const cancelBtn = wrapper.createEl("button", { cls: "hermione-cancel-btn" });
     setIcon(cancelBtn, "x");
-    cancelBtn.title = "Abbrechen";
+    cancelBtn.title = t().renderer.cancelTitle;
     cancelBtn.style.display = "none";
 
     // Edit mode handler
@@ -1802,7 +1809,7 @@ export class MatrixRenderer extends MarkdownRenderChild {
       // Zoom out button
       const zoomOutBtn = zoomControls.createEl("button", { cls: "hermione-zoom-btn" });
       setIcon(zoomOutBtn, "minus");
-      zoomOutBtn.title = "Verkleinern";
+      zoomOutBtn.title = t().renderer.zoomOut;
       zoomOutBtn.addEventListener("click", () => this.zoomOut());
 
       // Zoom display/reset
@@ -1810,13 +1817,13 @@ export class MatrixRenderer extends MarkdownRenderChild {
         cls: "hermione-zoom-display",
         text: `${this.zoomLevel}%`
       });
-      this.zoomDisplay.title = "Zoom zurücksetzen";
+      this.zoomDisplay.title = t().renderer.zoomReset;
       this.zoomDisplay.addEventListener("click", () => this.resetZoom());
 
       // Zoom in button
       const zoomInBtn = zoomControls.createEl("button", { cls: "hermione-zoom-btn" });
       setIcon(zoomInBtn, "plus");
-      zoomInBtn.title = "Vergrößern";
+      zoomInBtn.title = t().renderer.zoomIn;
       zoomInBtn.addEventListener("click", () => this.zoomIn());
 
       // Zoom slider
@@ -1828,7 +1835,7 @@ export class MatrixRenderer extends MarkdownRenderChild {
       slider.max = String(MatrixRenderer.ZOOM_MAX);
       slider.step = String(MatrixRenderer.ZOOM_STEP);
       slider.value = String(this.zoomLevel);
-      slider.title = "Zoom";
+      slider.title = t().renderer.zoomSlider;
       slider.addEventListener("input", (e) => {
         this.zoomLevel = parseInt((e.target as HTMLInputElement).value);
         this.applyZoom();
@@ -1838,7 +1845,7 @@ export class MatrixRenderer extends MarkdownRenderChild {
     // Refresh button
     const refreshBtn = toolbar.createEl("button", {
       cls: "hermione-refresh-btn",
-      text: "Aktualisieren"
+      text: t().renderer.refreshBtn
     });
     setIcon(refreshBtn, "refresh-cw");
     refreshBtn.addEventListener("click", () => this.onRefresh());

@@ -1,5 +1,6 @@
 import { App, Modal } from "obsidian";
 import { applyTransform } from "./value-transform";
+import { t } from "./i18n";
 
 /**
  * Modal for choosing an exact raw value when dropping into a transformed group cell.
@@ -25,13 +26,13 @@ export class ValuePickerModal extends Modal {
 
     // Header
     contentEl.createEl("h3", {
-      text: `Wert für "${this.axisName}" wählen`
+      text: t().valuePicker.heading(this.axisName)
     });
 
     // Group info
     contentEl.createEl("p", {
       cls: "hermione-picker-info",
-      text: `Zielgruppe: ${this.groupLabel}`
+      text: t().valuePicker.targetGroup(this.groupLabel)
     });
 
     // Input field
@@ -39,7 +40,7 @@ export class ValuePickerModal extends Modal {
     const input = inputContainer.createEl("input", {
       cls: "hermione-picker-input",
       type: "text",
-      placeholder: "Wert eingeben..."
+      placeholder: t().valuePicker.placeholder
     });
     input.focus();
 
@@ -51,7 +52,7 @@ export class ValuePickerModal extends Modal {
       const suggestionsContainer = contentEl.createDiv({ cls: "hermione-picker-suggestions" });
       suggestionsContainer.createEl("span", {
         cls: "hermione-picker-suggestions-label",
-        text: "Vorhandene Werte:"
+        text: t().valuePicker.existingValues
       });
 
       const suggestionsWrapper = suggestionsContainer.createDiv({ cls: "hermione-picker-suggestions-list" });
@@ -72,13 +73,13 @@ export class ValuePickerModal extends Modal {
 
     const confirmBtn = buttonContainer.createEl("button", {
       cls: "hermione-picker-confirm mod-cta",
-      text: "Übernehmen"
+      text: t().valuePicker.confirm
     });
     confirmBtn.disabled = true;
 
     const cancelBtn = buttonContainer.createEl("button", {
       cls: "hermione-picker-cancel",
-      text: "Abbrechen"
+      text: t().valuePicker.cancel
     });
 
     // Input validation on every keystroke
@@ -96,11 +97,11 @@ export class ValuePickerModal extends Modal {
       const transformed = String(applyTransform(parsed, this.transformFn));
 
       if (transformed === this.groupLabel) {
-        validation.textContent = `✓ Wert ${raw} → Gruppe "${transformed}"`;
+        validation.textContent = t().valuePicker.valid(raw, transformed);
         validation.className = "hermione-picker-validation hermione-picker-valid";
         confirmBtn.disabled = false;
       } else {
-        validation.textContent = `✗ Wert ${raw} gehört zu Gruppe "${transformed}", nicht "${this.groupLabel}"`;
+        validation.textContent = t().valuePicker.invalid(raw, transformed, this.groupLabel);
         validation.className = "hermione-picker-validation hermione-picker-invalid";
         confirmBtn.disabled = true;
       }

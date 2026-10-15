@@ -1,4 +1,5 @@
 import { App, TFile, MarkdownRenderChild, setIcon, MarkdownRenderer, Component } from "obsidian";
+import { t } from "./i18n";
 import { HermioneConfig, DocumentData, QueryResult } from "./types";
 import { FrontmatterUpdater } from "./frontmatter-updater";
 import { compileTransform, applyTransform, buildReverseMap } from "./value-transform";
@@ -49,20 +50,25 @@ type HitRegion =
 const GAP = 8;
 const HEADER_PAD = 12;
 const CELL_PAD = 8;
-const CARD_MIN_H = 28;
 const CARD_PAD_V = 6;
 const LINE_HEIGHT = 16;
 const CARD_FONT = `500 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
-const CARD_GAP = 6;
 const COLOR_BAR_W = 4;
 const CARD_RADIUS = 4;
 const CELL_RADIUS = 6;
 const HEADER_RADIUS = 4;
-const MIN_CELL_W = 150;
-const MIN_CELL_H = 100;
+const MIN_CELL_W = 120;
+const MIN_CELL_H = 80;
 const Y_HEADER_W = 110;
 const HANDLE_SIZE = 8;
 const DRAG_THRESHOLD = 5;
+
+// Dot mode constants
+const DOT_RADIUS = 12;
+const DOT_GAP = 6;
+const DOT_SPACING = DOT_RADIUS * 2 + DOT_GAP; // 30
+const GROUP_BG_PAD = 12;
+const GROUP_BG_ALPHA = 0.12;
 
 const ZOOM_MIN = 50;
 const ZOOM_MAX = 150;
@@ -123,6 +129,9 @@ export class CanvasRenderer extends MarkdownRenderChild {
 
   // Text measurement (offscreen)
   private measureCtx: CanvasRenderingContext2D | null = null;
+
+  // Dot-mode: groups of multiple dots sharing the same cell
+  private dotGroups: Array<{ cx: number; cy: number; r: number }> = [];
 
   // Theme colors (resolved from CSS vars)
   private colors = {
@@ -192,6 +201,9 @@ export class CanvasRenderer extends MarkdownRenderChild {
     if (this.config.title) {
       this.containerEl.createEl("h3", { cls: "hermione-title", text: this.config.title });
     }
+    if (this.config.description) {
+      this.containerEl.createEl("p", { cls: "hermione-description", text: this.config.description });
+    }
 
     if (this.result.errors.length > 0) {
       const errorContainer = this.containerEl.createDiv({ cls: "hermione-errors" });
@@ -202,7 +214,7 @@ export class CanvasRenderer extends MarkdownRenderChild {
     }
 
     if (this.result.documents.length === 0) {
-      this.containerEl.createDiv({ cls: "hermione-empty", text: "Keine Dokumente gefunden." });
+      this.containerEl.createDiv({ cls: "hermione-empty", text: t().renderer.noDocuments });
       return;
     }
 
@@ -337,33 +349,21 @@ export class CanvasRenderer extends MarkdownRenderChild {
     return lines.length > 0 ? lines : [""];
   }
 
-  private measureCard(name: string, cardWidth: number): { lines: string[]; height: number } {
-    const textMaxW = cardWidth - COLOR_BAR_W - 16;
-    const lines = this.wrapText(name, textMaxW);
-    const height = Math.max(CARD_MIN_H, CARD_PAD_V * 2 + lines.length * LINE_HEIGHT);
-    return { lines, height };
-  }
-
   // ── Value-to-Pixel Interpolation ─────────────────────────────────
 
   /**
    * Maps a raw numeric value to an exact pixel position on the given axis.
-   * Uses linear interpolation across the full grid extent:
-   *   first axis value → center of first cell
-   *   last axis value  → center of last cell
-   * Values outside the range are extrapolated.
+   * Uses piecewise linear interpolation between adjacent cell centers so that
+   * non-uniform axis spacing and variable cell heights are handled correctly.
    */
   private interpolatePosition(rawValue: number, axisValues: any[], axis: "x" | "y"): number | null {
-    if (isNaN(rawValue)) {
-      console.warn("Hermione interp: rawValue is NaN");
-      return null;
-    }
+    if (isNaN(rawValue)) return null;
 
     // Collect valid numeric axis entries with their cell centers
     const entries: { val: number; center: number }[] = [];
     for (let i = 0; i < axisValues.length; i++) {
       const v = parseFloat(String(axisValues[i]));
-      if (isNaN(v)) continue; // skip non-numeric values, don't abort
+      if (isNaN(v)) continue;
       const cell = this.cells.find(c =>
         axis === "x" ? c.xIdx === i : c.yIdx === i
       );
@@ -375,24 +375,27 @@ export class CanvasRenderer extends MarkdownRenderChild {
           : cell.rect.y + cell.rect.h / 2
       });
     }
-    console.warn("Hermione interp:", { rawValue, axis, entriesLen: entries.length, axisValuesLen: axisValues.length, cellsLen: this.cells.length });
-    if (entries.length < 2) {
-      console.warn("Hermione interp: entries < 2, returning null");
-      return null;
-    }
+    if (entries.length < 2) return null;
 
-    // Sort ascending by value
+    // Sort ascending by numeric value
     entries.sort((a, b) => a.val - b.val);
 
-    // Simple two-point linear mapping (first ↔ last)
-    const first = entries[0];
-    const last = entries[entries.length - 1];
-    if (first.val === last.val) return null;
+    // Clamp to known range
+    if (rawValue <= entries[0].val) return entries[0].center;
+    if (rawValue >= entries[entries.length - 1].val) return entries[entries.length - 1].center;
 
-    const t = (rawValue - first.val) / (last.val - first.val);
-    const result = first.center + t * (last.center - first.center);
-    console.warn("Hermione interp result:", { rawValue, first: first.val, last: last.val, t, result });
-    return result;
+    // Piecewise linear interpolation between adjacent entries
+    for (let i = 0; i < entries.length - 1; i++) {
+      const a = entries[i];
+      const b = entries[i + 1];
+      if (rawValue >= a.val && rawValue <= b.val) {
+        if (a.val === b.val) return a.center;
+        const t = (rawValue - a.val) / (b.val - a.val);
+        return a.center + t * (b.center - a.center);
+      }
+    }
+
+    return null;
   }
 
   // ── Layout Calculation ───────────────────────────────────────────
@@ -402,6 +405,7 @@ export class CanvasRenderer extends MarkdownRenderChild {
     this.xHeaders = [];
     this.yHeaders = [];
     this.cards = [];
+    this.dotGroups = [];
 
     if (this.isSingleAxis) {
       this.calculateSingleAxisLayout();
@@ -445,31 +449,14 @@ export class CanvasRenderer extends MarkdownRenderChild {
       }
     }
 
-    // Pre-measure card text for dynamic heights
-    const cardW = cellW - CELL_PAD * 2;
-    const cardMeasurements: { lines: string[]; height: number }[][][] = [];
-    for (let yi = 0; yi < yCount; yi++) {
-      cardMeasurements[yi] = [];
-      for (let xi = 0; xi < xCount; xi++) {
-        cardMeasurements[yi][xi] = cellDocs[yi][xi].map(doc =>
-          this.measureCard(doc.name, cardW)
-        );
-      }
-    }
-
-    // Row heights based on measured card content
+    // Row heights based on dot cluster size
     const rowHeights: number[] = [];
     for (let yi = 0; yi < yCount; yi++) {
-      let maxContentH = 0;
+      let maxClusterH = 0;
       for (let xi = 0; xi < xCount; xi++) {
-        const measurements = cardMeasurements[yi][xi];
-        if (measurements.length > 0) {
-          const totalCardH = measurements.reduce((sum, m) => sum + m.height, 0);
-          const totalGap = (measurements.length - 1) * CARD_GAP;
-          maxContentH = Math.max(maxContentH, totalCardH + totalGap + CELL_PAD * 2);
-        }
+        maxClusterH = Math.max(maxClusterH, this.dotClusterHeight(cellDocs[yi][xi].length));
       }
-      rowHeights[yi] = Math.max(MIN_CELL_H, maxContentH);
+      rowHeights[yi] = Math.max(MIN_CELL_H, maxClusterH + CELL_PAD * 2);
     }
 
     // Build layout
@@ -512,26 +499,11 @@ export class CanvasRenderer extends MarkdownRenderChild {
           yIdx: yi
         });
 
-        // Cards in this cell (dynamic heights)
+        // Place dots for this cell (centered)
         const docs = cellDocs[yi][xi];
-        const measurements = cardMeasurements[yi][xi];
-        let cardOffsetY = 0;
-        for (let di = 0; di < docs.length; di++) {
-          const m = measurements[di];
-          const cardX = cx + CELL_PAD;
-          const cardY = curY + CELL_PAD + cardOffsetY;
-          const style = evaluateCardStyle(docs[di], this.cardStyleFn);
-          this.cards.push({
-            doc: docs[di],
-            rect: { x: cardX, y: cardY, w: cardW, h: m.height },
-            style,
-            colorBarColor: style.color || getDocumentColor(docs[di].name),
-            isRange: false,
-            isVertical: false,
-            textLines: m.lines
-          });
-          cardOffsetY += m.height + CARD_GAP;
-        }
+        const cellCX = cx + cellW / 2;
+        const cellCY = curY + rowHeights[yi] / 2;
+        this.placeDots(docs, cellCX, cellCY);
       }
 
       curY += rowH + GAP;
@@ -554,7 +526,6 @@ export class CanvasRenderer extends MarkdownRenderChild {
         let bottom = endCell.rect.y + endCell.rect.h;
 
         // Interpolate exact positions for range dimensions
-        console.warn("Hermione range card:", { doc: layout.doc.name, hasXRange: layout.hasXRange, hasYRange: layout.hasYRange, xAxis: this.config.xAxis, xAxisEnd: this.config.xAxisEnd, yAxis: this.config.yAxis, yAxisEnd: this.config.yAxisEnd });
         if (layout.hasXRange && this.config.xAxis && this.config.xAxisEnd) {
           const rawStart = getPropertyValue(layout.doc.properties, this.config.xAxis);
           const rawEnd = getPropertyValue(layout.doc.properties, this.config.xAxisEnd);
@@ -656,18 +627,12 @@ export class CanvasRenderer extends MarkdownRenderChild {
 
     if (this.isYOnly) {
       // Y-only: vertical layout — header left, cell right per row
-      const cellW = Math.max(MIN_CELL_W, 300);
-      const cardW = cellW - CELL_PAD * 2;
-      const headerH = 44;
+      const cellW = Math.max(MIN_CELL_W, 180);
       let curY = originY;
 
       for (let i = 0; i < axisValues.length; i++) {
         const docs = axisDocs[i];
-        const measurements = docs.map(doc => this.measureCard(doc.name, cardW));
-        const totalCardH = measurements.reduce((sum, m) => sum + m.height, 0);
-        const totalGap = Math.max(0, docs.length - 1) * CARD_GAP;
-        const contentH = docs.length > 0 ? totalCardH + totalGap + CELL_PAD * 2 : CELL_PAD * 2;
-        const rowH = Math.max(60, contentH);
+        const rowH = Math.max(60, this.dotClusterHeight(docs.length) + CELL_PAD * 2);
 
         this.yHeaders.push({
           rect: { x: originX, y: curY, w: Y_HEADER_W, h: rowH },
@@ -685,24 +650,7 @@ export class CanvasRenderer extends MarkdownRenderChild {
           yIdx: i
         });
 
-        let cardOffsetY = 0;
-        for (let di = 0; di < docs.length; di++) {
-          const m = measurements[di];
-          const cardX = cx + CELL_PAD;
-          const cardY = curY + CELL_PAD + cardOffsetY;
-          const style = evaluateCardStyle(docs[di], this.cardStyleFn);
-          this.cards.push({
-            doc: docs[di],
-            rect: { x: cardX, y: cardY, w: cardW, h: m.height },
-            style,
-            colorBarColor: style.color || getDocumentColor(docs[di].name),
-            isRange: false,
-            isVertical: false,
-            textLines: m.lines
-          });
-          cardOffsetY += m.height + CARD_GAP;
-        }
-
+        this.placeDots(docs, cx + cellW / 2, curY + rowH / 2);
         curY += rowH + GAP;
       }
 
@@ -715,7 +663,7 @@ export class CanvasRenderer extends MarkdownRenderChild {
       }
     } else {
       // X-only: horizontal layout — columns
-      const cellW = Math.max(MIN_CELL_W, 180);
+      const cellW = Math.max(MIN_CELL_W, 160);
       const headerH = 44;
       let curY = originY;
 
@@ -730,20 +678,12 @@ export class CanvasRenderer extends MarkdownRenderChild {
       }
       curY += headerH + GAP;
 
-      // Pre-measure cards and compute row height
-      const cardW = cellW - CELL_PAD * 2;
-      const axisMeasurements: { lines: string[]; height: number }[][] = [];
-      let maxContentH = 0;
+      // Row height based on max dot cluster
+      let maxClusterH = 0;
       for (let i = 0; i < axisValues.length; i++) {
-        const measurements = axisDocs[i].map(doc => this.measureCard(doc.name, cardW));
-        axisMeasurements[i] = measurements;
-        if (measurements.length > 0) {
-          const totalCardH = measurements.reduce((sum, m) => sum + m.height, 0);
-          const totalGap = (measurements.length - 1) * CARD_GAP;
-          maxContentH = Math.max(maxContentH, totalCardH + totalGap + CELL_PAD * 2);
-        }
+        maxClusterH = Math.max(maxClusterH, this.dotClusterHeight(axisDocs[i].length));
       }
-      const rowH = Math.max(120, maxContentH);
+      const rowH = Math.max(120, maxClusterH + CELL_PAD * 2);
 
       for (let i = 0; i < axisValues.length; i++) {
         const cx = originX + i * (cellW + GAP);
@@ -755,26 +695,7 @@ export class CanvasRenderer extends MarkdownRenderChild {
           xIdx: i,
           yIdx: -1
         });
-
-        const docs = axisDocs[i];
-        const measurements = axisMeasurements[i];
-        let cardOffsetY = 0;
-        for (let di = 0; di < docs.length; di++) {
-          const m = measurements[di];
-          const cardX = cx + CELL_PAD;
-          const cardY = curY + CELL_PAD + cardOffsetY;
-          const style = evaluateCardStyle(docs[di], this.cardStyleFn);
-          this.cards.push({
-            doc: docs[di],
-            rect: { x: cardX, y: cardY, w: cardW, h: m.height },
-            style,
-            colorBarColor: style.color || getDocumentColor(docs[di].name),
-            isRange: false,
-            isVertical: false,
-            textLines: m.lines
-          });
-          cardOffsetY += m.height + CARD_GAP;
-        }
+        this.placeDots(axisDocs[i], cx + cellW / 2, curY + rowH / 2);
       }
 
       curY += rowH + GAP;
@@ -843,10 +764,8 @@ export class CanvasRenderer extends MarkdownRenderChild {
       const rawEnd = getPropertyValue(layout.doc.properties, axisEndProperty);
       const displayStart = applyTransform(rawStart, transformFn);
       const displayEnd = applyTransform(rawEnd, transformFn);
-      console.warn("Hermione single-axis range:", { doc: layout.doc.name, rawStart, rawEnd, displayStart, displayEnd, axisProperty, axisEndProperty, axis });
       const p1 = this.interpolatePosition(parseFloat(String(displayStart)), axisValues, axis);
       const p2 = this.interpolatePosition(parseFloat(String(displayEnd)), axisValues, axis);
-      console.warn("Hermione single-axis interp results:", { p1, p2 });
 
       if (axis === "x") {
         const interpLeft = (p1 !== null && p2 !== null) ? Math.min(p1, p2) : startCell.rect.x;
@@ -957,24 +876,28 @@ export class CanvasRenderer extends MarkdownRenderChild {
       this.drawTruncatedText(h.label, h.rect.x + h.rect.w - HEADER_PAD, h.rect.y + h.rect.h / 2, h.rect.w - HEADER_PAD * 2);
     }
 
-    // Draw non-range cards
+    // Draw group background circles (multi-dot clusters)
+    for (const g of this.dotGroups) {
+      this.drawGroupCircle(g.cx, g.cy, g.r);
+    }
+
+    // Draw non-range dots
     for (const card of this.cards) {
       if (card.isRange) continue;
-      if (this.dragState?.dragging && this.dragState.card === card) continue; // skip dragged card
-      this.drawCard(card);
+      if (this.dragState?.dragging && this.dragState.card === card) continue;
+      this.drawDot(card);
     }
 
     // Draw range cards
     for (const card of this.cards) {
       if (!card.isRange) continue;
       this.drawCard(card);
-      // Draw resize handles on hover
       if (this.hoveredCard === card && card.rangeLayout) {
         this.drawResizeHandles(card);
       }
     }
 
-    // Draw drag preview
+    // Draw drag ghost (dot)
     if (this.dragState?.dragging) {
       ctx.save();
       ctx.globalAlpha = 0.6;
@@ -990,7 +913,7 @@ export class CanvasRenderer extends MarkdownRenderChild {
           h: card.rect.h
         }
       };
-      this.drawCard(ghostCard);
+      this.drawDot(ghostCard);
       ctx.restore();
     }
   }
@@ -1073,6 +996,117 @@ export class CanvasRenderer extends MarkdownRenderChild {
     }
 
     ctx.globalAlpha = 1;
+  }
+
+  // ── Dot Mode Helpers ─────────────────────────────────────────────
+
+  /** Returns {dx,dy} offsets from center for n dots arranged in a compact grid. */
+  private arrangeDots(n: number): { dx: number; dy: number }[] {
+    if (n === 1) return [{ dx: 0, dy: 0 }];
+    const cols = Math.ceil(Math.sqrt(n));
+    const rows = Math.ceil(n / cols);
+    const offsets: { dx: number; dy: number }[] = [];
+    for (let i = 0; i < n; i++) {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const rowDotCount = row === rows - 1 ? n - row * cols : cols;
+      const rowShift = ((cols - rowDotCount) / 2) * DOT_SPACING;
+      const dx = (col - (cols - 1) / 2) * DOT_SPACING + (row === rows - 1 ? rowShift : 0);
+      const dy = (row - (rows - 1) / 2) * DOT_SPACING;
+      offsets.push({ dx, dy });
+    }
+    return offsets;
+  }
+
+  /** Radius of the group background circle for n dots. */
+  private computeGroupRadius(n: number): number {
+    const cols = Math.ceil(Math.sqrt(n));
+    const rows = Math.ceil(n / cols);
+    const halfW = ((cols - 1) / 2) * DOT_SPACING + DOT_RADIUS;
+    const halfH = ((rows - 1) / 2) * DOT_SPACING + DOT_RADIUS;
+    return Math.sqrt(halfW * halfW + halfH * halfH) + GROUP_BG_PAD;
+  }
+
+  /** Pixel height needed for a cluster of n dots. */
+  private dotClusterHeight(n: number): number {
+    if (n <= 1) return DOT_RADIUS * 2;
+    const cols = Math.ceil(Math.sqrt(n));
+    const rows = Math.ceil(n / cols);
+    return DOT_RADIUS * 2 + (rows - 1) * DOT_SPACING;
+  }
+
+  /** Creates CardInfos for point docs, centered at (cx, cy). Registers group if n > 1. */
+  private placeDots(docs: DocumentData[], cx: number, cy: number): void {
+    if (docs.length === 0) return;
+    const offsets = this.arrangeDots(docs.length);
+    for (let i = 0; i < docs.length; i++) {
+      const dotCX = cx + offsets[i].dx;
+      const dotCY = cy + offsets[i].dy;
+      const style = evaluateCardStyle(docs[i], this.cardStyleFn);
+      this.cards.push({
+        doc: docs[i],
+        rect: { x: dotCX - DOT_RADIUS, y: dotCY - DOT_RADIUS, w: DOT_RADIUS * 2, h: DOT_RADIUS * 2 },
+        style,
+        colorBarColor: style.color || getDocumentColor(docs[i].name),
+        isRange: false,
+        isVertical: false,
+        textLines: []
+      });
+    }
+    if (docs.length > 1) {
+      this.dotGroups.push({ cx, cy, r: this.computeGroupRadius(docs.length) });
+    }
+  }
+
+  private drawDot(card: CardInfo): void {
+    const ctx = this.ctx;
+    const cx = card.rect.x + DOT_RADIUS;
+    const cy = card.rect.y + DOT_RADIUS;
+    const isHovered = this.hoveredCard === card;
+
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.2)";
+    ctx.shadowBlur = isHovered ? 14 : 5;
+    ctx.shadowOffsetY = isHovered ? 3 : 2;
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, DOT_RADIUS, 0, Math.PI * 2);
+    ctx.fillStyle = card.style.background || card.colorBarColor;
+    ctx.fill();
+    ctx.restore();
+
+    // Border / hover ring (no shadow)
+    ctx.beginPath();
+    ctx.arc(cx, cy, DOT_RADIUS, 0, Math.PI * 2);
+    if (isHovered) {
+      ctx.strokeStyle = this.colors.accent;
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+    } else if (card.style.border) {
+      ctx.strokeStyle = card.style.border;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+  }
+
+  private drawGroupCircle(cx: number, cy: number, r: number): void {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha = GROUP_BG_ALPHA;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = this.colors.accent;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  private pointInDot(px: number, py: number, card: CardInfo): boolean {
+    const cx = card.rect.x + DOT_RADIUS;
+    const cy = card.rect.y + DOT_RADIUS;
+    const dx = px - cx;
+    const dy = py - cy;
+    const hitR = DOT_RADIUS + 3;
+    return dx * dx + dy * dy <= hitR * hitR;
   }
 
   // ── Drawing Helpers ──────────────────────────────────────────────
@@ -1203,7 +1237,10 @@ export class CanvasRenderer extends MarkdownRenderChild {
     // Check cards (reverse order for z-order — range cards drawn last)
     for (let i = this.cards.length - 1; i >= 0; i--) {
       const card = this.cards[i];
-      if (this.pointInRect(lx, ly, card.rect)) {
+      const hit = card.isRange
+        ? this.pointInRect(lx, ly, card.rect)
+        : this.pointInDot(lx, ly, card);
+      if (hit) {
         return { type: "card", card };
       }
     }
@@ -1631,7 +1668,7 @@ export class CanvasRenderer extends MarkdownRenderChild {
         this.app, previewContent + (truncated ? "\n\n*...*" : ""), content, doc.path, new Component()
       );
     } catch {
-      content.createSpan({ text: "Vorschau nicht verfügbar", cls: "hermione-preview-error" });
+      content.createSpan({ text: t().renderer.previewUnavailable, cls: "hermione-preview-error" });
     }
   }
 
@@ -1730,7 +1767,7 @@ export class CanvasRenderer extends MarkdownRenderChild {
     if (unassigned.length === 0) return;
 
     const section = this.containerEl.createDiv({ cls: "hermione-unassigned" });
-    section.createEl("strong", { text: "Nicht zugeordnet:" });
+    section.createEl("strong", { text: t().renderer.unassigned });
     const items = section.createDiv({ cls: "hermione-unassigned-items" });
 
     for (const doc of unassigned) {
@@ -1757,7 +1794,7 @@ export class CanvasRenderer extends MarkdownRenderChild {
 
     const zoomOutBtn = zoomControls.createEl("button", { cls: "hermione-zoom-btn" });
     setIcon(zoomOutBtn, "minus");
-    zoomOutBtn.title = "Verkleinern";
+    zoomOutBtn.title = t().renderer.zoomOut;
     zoomOutBtn.addEventListener("click", () => {
       if (this.zoomLevel > ZOOM_MIN) {
         this.zoomLevel -= ZOOM_STEP;
@@ -1771,7 +1808,7 @@ export class CanvasRenderer extends MarkdownRenderChild {
       cls: "hermione-zoom-display",
       text: `${this.zoomLevel}%`
     });
-    this.zoomDisplay.title = "Zoom zurücksetzen";
+    this.zoomDisplay.title = t().renderer.zoomReset;
     this.zoomDisplay.addEventListener("click", () => {
       this.zoomLevel = 100;
       this.applyCanvasSize();
@@ -1781,7 +1818,7 @@ export class CanvasRenderer extends MarkdownRenderChild {
 
     const zoomInBtn = zoomControls.createEl("button", { cls: "hermione-zoom-btn" });
     setIcon(zoomInBtn, "plus");
-    zoomInBtn.title = "Vergrößern";
+    zoomInBtn.title = t().renderer.zoomIn;
     zoomInBtn.addEventListener("click", () => {
       if (this.zoomLevel < ZOOM_MAX) {
         this.zoomLevel += ZOOM_STEP;
@@ -1796,7 +1833,7 @@ export class CanvasRenderer extends MarkdownRenderChild {
     slider.max = String(ZOOM_MAX);
     slider.step = String(ZOOM_STEP);
     slider.value = String(this.zoomLevel);
-    slider.title = "Zoom";
+    slider.title = t().renderer.zoomSlider;
     slider.addEventListener("input", (e) => {
       this.zoomLevel = parseInt((e.target as HTMLInputElement).value);
       this.applyCanvasSize();
@@ -1805,7 +1842,7 @@ export class CanvasRenderer extends MarkdownRenderChild {
     });
 
     // Refresh button
-    const refreshBtn = toolbar.createEl("button", { cls: "hermione-refresh-btn", text: "Aktualisieren" });
+    const refreshBtn = toolbar.createEl("button", { cls: "hermione-refresh-btn", text: t().renderer.refreshBtn });
     setIcon(refreshBtn, "refresh-cw");
     refreshBtn.addEventListener("click", () => this.onRefresh());
   }

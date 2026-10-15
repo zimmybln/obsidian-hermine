@@ -1,9 +1,12 @@
-import { App, Plugin, MarkdownPostProcessorContext, PluginSettingTab, Setting } from "obsidian";
+import { App, Plugin, MarkdownPostProcessorContext, PluginSettingTab, Setting, TFolder } from "obsidian";
 import { parseHermioneBlock } from "./parser";
 import { QueryEngine } from "./query-engine";
 import { MatrixRenderer } from "./matrix-renderer";
 import { CanvasRenderer } from "./canvas-renderer";
-import { HermioneConfig } from "./types";
+import type { HermioneConfig } from "./types";
+import { HermioneView, HERMIONE_VIEW_TYPE } from "./hermione-view";
+import { t } from "./i18n";
+import { parseTopicBlock, TopicRenderer } from "./topic";
 
 interface HermioneSettings {
   refreshOnChange: boolean;
@@ -27,6 +30,39 @@ export default class HermionePlugin extends Plugin {
     // Register the code block processor for "hermione" blocks
     this.registerMarkdownCodeBlockProcessor("hermione", this.processHermioneBlock.bind(this));
 
+    // Register the code block processor for "hermione-topic" blocks (interactive slider)
+    this.registerMarkdownCodeBlockProcessor("hermione-topic", (source, el, ctx) => {
+      try {
+        ctx.addChild(new TopicRenderer(el, this.app, parseTopicBlock(source), ctx, source));
+      } catch (error) {
+        el.createDiv({ cls: "hermione-error", text: t().renderer.error(error.message) });
+      }
+    });
+
+    // Register dedicated .hermione file view
+    this.registerView(HERMIONE_VIEW_TYPE, (leaf) => new HermioneView(leaf, this));
+    this.registerExtensions(["hermione"], HERMIONE_VIEW_TYPE);
+
+    // Ribbon icon to create a new Hermione document
+    this.addRibbonIcon("grid-3x3", t().ribbon.createNew, async () => {
+      await this.createHermioneFile();
+    });
+
+    // File explorer context menu for folders
+    this.registerEvent(
+      this.app.workspace.on("file-menu", (menu, file) => {
+        if (file instanceof TFolder) {
+          menu.addItem((item) => {
+            item.setTitle(t().contextMenu.newView)
+              .setIcon("grid-3x3")
+              .onClick(async () => {
+                await this.createHermioneFile(file.path);
+              });
+          });
+        }
+      })
+    );
+
     // Add settings tab
     this.addSettingTab(new HermioneSettingTab(this.app, this));
 
@@ -43,6 +79,25 @@ export default class HermionePlugin extends Plugin {
 
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
+  }
+
+  async createHermioneFile(folderPath?: string): Promise<void> {
+    const folder = folderPath ?? (this.app.fileManager as any).getNewFileParent("")?.path ?? "";
+    const baseName = t().file.newViewBaseName;
+    const templateContent = t().file.templateContent;
+
+    let fileName = folder ? `${folder}/${baseName}.hermione` : `${baseName}.hermione`;
+    let counter = 1;
+    while (this.app.vault.getAbstractFileByPath(fileName)) {
+      fileName = folder
+        ? `${folder}/${baseName} ${counter}.hermione`
+        : `${baseName} ${counter}.hermione`;
+      counter++;
+    }
+
+    const file = await this.app.vault.create(fileName, templateContent);
+    const leaf = this.app.workspace.getLeaf(false);
+    await leaf.openFile(file);
   }
 
   /**
@@ -69,7 +124,7 @@ export default class HermionePlugin extends Plugin {
       const result = await this.queryEngine.execute(config);
 
       // Choose renderer class based on config
-      const RendererClass = config.renderer === "canvas" ? CanvasRenderer : MatrixRenderer;
+      const RendererClass = config.renderer === "html" ? MatrixRenderer : CanvasRenderer;
 
       // Create refresh callback
       const refresh = async () => {
@@ -87,7 +142,7 @@ export default class HermionePlugin extends Plugin {
       // Show error message
       el.createDiv({
         cls: "hermione-error",
-        text: `Hermione Error: ${error.message}`
+        text: t().renderer.error(error.message)
       });
     }
   }
@@ -108,11 +163,11 @@ class HermioneSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: "Hermione Einstellungen" });
+    containerEl.createEl("h2", { text: t().settings.heading });
 
     new Setting(containerEl)
-      .setName("Automatisch aktualisieren")
-      .setDesc("Aktualisiert die Ansicht automatisch, wenn Dokumente geändert werden")
+      .setName(t().settings.autoRefreshName)
+      .setDesc(t().settings.autoRefreshDesc)
       .addToggle(toggle => toggle
         .setValue(this.plugin.settings.refreshOnChange)
         .onChange(async (value) => {
@@ -121,11 +176,11 @@ class HermioneSettingTab extends PluginSettingTab {
         }));
 
     new Setting(containerEl)
-      .setName("Standard-Sortierung")
-      .setDesc("Standard-Sortierrichtung für Abfragen")
+      .setName(t().settings.defaultSortName)
+      .setDesc(t().settings.defaultSortDesc)
       .addDropdown(dropdown => dropdown
-        .addOption("asc", "Aufsteigend")
-        .addOption("desc", "Absteigend")
+        .addOption("asc", t().settings.sortAsc)
+        .addOption("desc", t().settings.sortDesc)
         .setValue(this.plugin.settings.defaultSort)
         .onChange(async (value: "asc" | "desc") => {
           this.plugin.settings.defaultSort = value;
@@ -133,7 +188,7 @@ class HermioneSettingTab extends PluginSettingTab {
         }));
 
     // Usage instructions
-    containerEl.createEl("h3", { text: "Verwendung" });
+    containerEl.createEl("h3", { text: t().settings.usageHeading });
 
     const usageEl = containerEl.createDiv({ cls: "hermione-settings-usage" });
     usageEl.innerHTML = `

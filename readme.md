@@ -92,3 +92,25 @@ Durch Ziehen der Handles wird der Start- oder Endwert aktualisiert und ins Front
 Transform-Support funktioniert auch für Range-Endwerte
 Alle bestehenden Card-Styles (card-style) werden angewendet
 Vertikale Range-Karten zeigen den Text um 90° gedreht an
+## Themen-Slider (`hermione-topic`)
+
+Ein Codeblock mit der Sprachkennung `hermione-topic` zeigt einen interaktiven Slider an.
+Der eingestellte Wert wird beim Loslassen als `wert:` in den Codeblock zurückgeschrieben.
+
+```hermione-topic
+titel: Zufriedenheit
+skala: direkt
+min: 0
+max: 100
+schritte: 10
+wert: 40
+```
+
+| Eigenschaft | Aliase | Bedeutung |
+|---|---|---|
+| `skala` | `scale` | Art der Skalenfestlegung. Bisher: `direkt` (Standard) |
+| `min` | `minimum` | Minimalwert (Pflicht) |
+| `max` | `maximum` | Maximalwert (Pflicht) |
+| `schritte` | `steps`, `zwischenschritte` | Anzahl der Intervalle zwischen min und max (`0..100` mit `10` → 0, 10, …, 100). Ohne Angabe: stufenlos |
+| `wert` | `value` | Aktueller Wert (wird vom Slider gesetzt) |
+| `titel`, `beschreibung` | `title`, `description` | Optionale Überschrift und Beschreibung |

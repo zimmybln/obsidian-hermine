@@ -1,4 +1,5 @@
 import { App, TFile, TFolder, CachedMetadata, getAllTags } from "obsidian";
+import { t } from "./i18n";
 import { HermioneConfig, DocumentData, QueryResult } from "./types";
 import { compileTransform, applyTransform } from "./value-transform";
 
@@ -122,7 +123,7 @@ export class QueryEngine {
             }
           }
         } catch (e) {
-          result.errors.push(`Filter error: ${e.message}`);
+          result.errors.push(t().query.filterError(e.message));
         }
       }
 
@@ -136,7 +137,7 @@ export class QueryEngine {
       }
 
     } catch (error) {
-      result.errors.push(`Query error: ${error.message}`);
+      result.errors.push(t().query.queryError(error.message));
     }
 
     return result;
@@ -145,7 +146,7 @@ export class QueryEngine {
   /**
    * Get files matching the source specification
    */
-  private getSourceFiles(source: string): TFile[] {
+  getSourceFiles(source: string): TFile[] {
     const files: TFile[] = [];
     const vault = this.app.vault;
 
@@ -246,7 +247,7 @@ export class QueryEngine {
   /**
    * Get a property value, supporting nested paths like "author.name"
    */
-  private getPropertyValue(properties: Record<string, any>, path: string): any {
+  getPropertyValue(properties: Record<string, any>, path: string): any {
     const parts = path.split(".");
     let value = properties;
 
