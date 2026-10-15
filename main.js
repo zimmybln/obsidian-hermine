@@ -109,16 +109,18 @@ var de = {
     invalidSteps: (raw) => `Schritte m\xFCssen eine ganze Zahl \u2265 1 sein, erhalten: "${raw}"`,
     unknownScale: (raw) => `Unbekannte Skala: "${raw}" (erlaubt: direkt, liste)`,
     valuesRequired: "Eine Listen-Skala ben\xF6tigt mindestens zwei Werte (werte)",
-    unassigned: (prop) => `Ohne Wert in "${prop}" \u2013 auf die Skala ziehen, um einen Wert zu setzen`,
+    unassigned: (props) => `Ohne Wert in ${props.map((p) => `"${p}"`).join(" bzw. ")} \u2013 auf die Positionsmatrix ziehen, um Werte zu setzen`,
     unknownValue: (raw) => `Wert "${raw}" kommt in der Skala nicht vor`,
     notInList: (count, prop) => `${count} ${count === 1 ? "Dokument hat" : "Dokumente haben"} in "${prop}" einen Wert, der nicht in der Skala vorkommt`,
     xAxisRequired: "Mit source muss auch x-achse (Eigenschaft der Dokumente) angegeben werden",
+    yAxisRequired: "Mit source und einer y-Skala muss auch y-achse (Eigenschaft der Dokumente) angegeben werden",
+    axisError: (axis, msg) => `${axis.toUpperCase()}-Achse: ${msg}`,
     newDocBaseName: "Dokument",
     created: (name) => `"${name}" erstellt`,
     sourceNotFolder: (source) => `Neue Dokumente ben\xF6tigen ein Verzeichnis als Quelle, nicht "${source}"`,
     docTooltip: (name, value) => `${name}: ${value}`,
     notNumeric: (count, prop) => `${count} ${count === 1 ? "Dokument hat" : "Dokumente haben"} keinen Zahlenwert in "${prop}"`,
-    outOfRange: (count) => `${count} ${count === 1 ? "Dokument liegt" : "Dokumente liegen"} au\xDFerhalb der Skala`
+    outOfRange: (count, prop) => `${count} ${count === 1 ? "Dokument liegt" : "Dokumente liegen"} mit "${prop}" au\xDFerhalb der Skala`
   }
 };
 var en = {
@@ -200,16 +202,18 @@ var en = {
     invalidSteps: (raw) => `Steps must be an integer \u2265 1, got: "${raw}"`,
     unknownScale: (raw) => `Unknown scale: "${raw}" (allowed: direct, list)`,
     valuesRequired: "A list scale requires at least two values (values)",
-    unassigned: (prop) => `No value in "${prop}" \u2013 drag onto the scale to set one`,
+    unassigned: (props) => `No value in ${props.map((p) => `"${p}"`).join(" or ")} \u2013 drag onto the position matrix to set values`,
     unknownValue: (raw) => `Value "${raw}" is not part of the scale`,
     notInList: (count, prop) => `${count} ${count === 1 ? "document has" : "documents have"} a value in "${prop}" that is not part of the scale`,
     xAxisRequired: "When source is set, x-axis (document property) is required",
+    yAxisRequired: "When source and a y scale are set, y-axis (document property) is required",
+    axisError: (axis, msg) => `${axis.toUpperCase()} axis: ${msg}`,
     newDocBaseName: "Document",
     created: (name) => `"${name}" created`,
     sourceNotFolder: (source) => `New documents require a folder as source, not "${source}"`,
     docTooltip: (name, value) => `${name}: ${value}`,
     notNumeric: (count, prop) => `${count} ${count === 1 ? "document has" : "documents have"} no numeric value in "${prop}"`,
-    outOfRange: (count) => `${count} ${count === 1 ? "document lies" : "documents lie"} outside the scale`
+    outOfRange: (count, prop) => `${count} ${count === 1 ? "document lies" : "documents lie"} outside the scale in "${prop}"`
   }
 };
 var translations = { de, en };
@@ -796,116 +800,17 @@ var FrontmatterUpdater = class {
    * Update a single property in a file's frontmatter
    */
   async updateProperty(file, propertyName, newValue) {
-    const content = await this.app.vault.read(file);
-    const updatedContent = this.updateFrontmatterProperty(content, propertyName, newValue);
-    await this.app.vault.modify(file, updatedContent);
+    await this.updateProperties(file, { [propertyName]: newValue });
   }
   /**
-   * Update multiple properties in a file's frontmatter
+   * Update multiple properties in a file's frontmatter.
+   * Uses Obsidian's processFrontMatter, which creates the frontmatter if
+   * needed, handles CRLF line endings and writes valid YAML for all value types.
    */
   async updateProperties(file, updates) {
-    let content = await this.app.vault.read(file);
-    for (const [propertyName, newValue] of Object.entries(updates)) {
-      content = this.updateFrontmatterProperty(content, propertyName, newValue);
-    }
-    await this.app.vault.modify(file, content);
-  }
-  /**
-   * Update a property in the frontmatter content
-   */
-  updateFrontmatterProperty(content, propertyName, newValue) {
-    const frontmatterRegex = /^---\n([\s\S]*?)\n---/;
-    const match = content.match(frontmatterRegex);
-    if (!match) {
-      const formattedValue = this.formatYamlValue(newValue);
-      return `---
-${propertyName}: ${formattedValue}
----
-
-${content}`;
-    }
-    const frontmatterContent = match[1];
-    const lines = frontmatterContent.split("\n");
-    let propertyFound = false;
-    let inMultilineValue = false;
-    let currentIndent = 0;
-    const updatedLines = lines.map((line, index) => {
-      const lineIndent = line.search(/\S/);
-      if (lineIndent === -1)
-        return line;
-      if (inMultilineValue) {
-        if (lineIndent > currentIndent || line.trim().startsWith("-")) {
-          return null;
-        } else {
-          inMultilineValue = false;
-        }
-      }
-      const propMatch = line.match(/^(\s*)([^:]+):\s*(.*)/);
-      if (propMatch) {
-        const [, indent, name, value] = propMatch;
-        if (name.trim() === propertyName) {
-          propertyFound = true;
-          const formattedValue = this.formatYamlValue(newValue);
-          if (Array.isArray(newValue)) {
-            inMultilineValue = true;
-            currentIndent = indent.length;
-            if (newValue.length === 0) {
-              return `${indent}${propertyName}: []`;
-            }
-            const listItems = newValue.map((v) => `${indent}  - ${this.formatYamlValue(v)}`).join("\n");
-            return `${indent}${propertyName}:
-${listItems}`;
-          }
-          return `${indent}${propertyName}: ${formattedValue}`;
-        }
-      }
-      return line;
-    }).filter((line) => line !== null);
-    if (!propertyFound) {
-      const formattedValue = this.formatYamlValue(newValue);
-      if (Array.isArray(newValue) && newValue.length > 0) {
-        const listItems = newValue.map((v) => `  - ${this.formatYamlValue(v)}`).join("\n");
-        updatedLines.push(`${propertyName}:
-${listItems}`);
-      } else {
-        updatedLines.push(`${propertyName}: ${formattedValue}`);
-      }
-    }
-    const updatedFrontmatter = updatedLines.join("\n");
-    return content.replace(frontmatterRegex, `---
-${updatedFrontmatter}
----`);
-  }
-  /**
-   * Format a value for YAML
-   */
-  formatYamlValue(value) {
-    if (value === null || value === void 0) {
-      return "";
-    }
-    if (typeof value === "boolean") {
-      return value ? "true" : "false";
-    }
-    if (typeof value === "number") {
-      return String(value);
-    }
-    if (typeof value === "string") {
-      if (value === "" || value.includes(":") || value.includes("#") || value.includes("'") || value.includes('"') || value.includes("\n") || value.startsWith(" ") || value.endsWith(" ") || /^[0-9]/.test(value) || ["true", "false", "null", "yes", "no"].includes(value.toLowerCase())) {
-        return `"${value.replace(/"/g, '\\"')}"`;
-      }
-      return value;
-    }
-    if (Array.isArray(value)) {
-      if (value.length === 0) {
-        return "[]";
-      }
-      return `[${value.map((v) => this.formatYamlValue(v)).join(", ")}]`;
-    }
-    if (typeof value === "object") {
-      const entries = Object.entries(value).map(([k, v]) => `${k}: ${this.formatYamlValue(v)}`).join(", ");
-      return `{${entries}}`;
-    }
-    return String(value);
+    await this.app.fileManager.processFrontMatter(file, (fm) => {
+      Object.assign(fm, updates);
+    });
   }
   /**
    * Parse a value from string input to appropriate type
@@ -4527,13 +4432,18 @@ var HermioneView = class extends import_obsidian6.TextFileView {
 
 // src/topic.ts
 var import_obsidian7 = require("obsidian");
-var VALUE_KEYS = ["wert", "value"];
+var VALUE_KEYS = {
+  x: ["wert", "value", "x-wert", "x-value"],
+  y: ["y-wert", "y-value"]
+};
 var CARD_STYLE_KEYS = ["card-style", "karten-stil", "cardstyle", "style", "stil"];
+var AXIS_PROPERTY_KEYS = { x: "x", xaxis: "x", y: "y", yaxis: "y" };
 var MAX_MARKS = 200;
 var MAX_LABELS = 10;
 var DOT_SIZE = 12;
 var DOT_GAP2 = 4;
 var DRAG_THRESHOLD2 = 3;
+var DEFAULT_HEIGHT = 240;
 function parseNumber(key, raw) {
   const num = parseFloat(raw.replace(",", "."));
   if (isNaN(num))
@@ -4559,10 +4469,102 @@ function indexInList(values, raw) {
   const needle = String(raw).trim().toLowerCase();
   return values.findIndex((v) => v.toLowerCase() === needle);
 }
-function parseTopicBlock(content) {
+function applyAxisKey(axis, key, value) {
+  switch (key) {
+    case "scale":
+    case "skala": {
+      const v = value.toLowerCase();
+      if (v === "direkt" || v === "direct")
+        axis.scale = "direct";
+      else if (v === "liste" || v === "list")
+        axis.scale = "list";
+      else
+        throw new Error(t().topic.unknownScale(value));
+      return true;
+    }
+    case "werte":
+    case "values":
+    case "skala-werte":
+    case "scale-values":
+      axis.values = parseValueList(value);
+      return true;
+    case "min":
+    case "minimum":
+      axis.min = parseNumber(key, value);
+      return true;
+    case "max":
+    case "maximum":
+      axis.max = parseNumber(key, value);
+      return true;
+    case "steps":
+    case "schritte":
+    case "zwischenschritte": {
+      const steps = parseNumber(key, value);
+      if (!Number.isInteger(steps) || steps < 1)
+        throw new Error(t().topic.invalidSteps(value));
+      axis.steps = steps;
+      return true;
+    }
+    case "wert":
+    case "value":
+      if (value)
+        axis.value = value;
+      return true;
+    case "exakt":
+    case "exact":
+      axis.exact = value.toLowerCase() === "true" || value.toLowerCase() === "ja";
+      return true;
+    case "achse":
+    case "axis":
+      axis.property = value;
+      return true;
+  }
+  return false;
+}
+function finalizeAxis(raw) {
   var _a, _b;
-  const config = {};
-  let rawValue;
+  const scale = (_a = raw.scale) != null ? _a : raw.values ? "list" : "direct";
+  if (scale === "list") {
+    const values = (_b = raw.values) != null ? _b : [];
+    if (values.length < 2)
+      throw new Error(t().topic.valuesRequired);
+    let value;
+    if (raw.value !== void 0) {
+      value = indexInList(values, raw.value.replace(/^["'](.*)["']$/, "$1"));
+      if (value === -1)
+        throw new Error(t().topic.unknownValue(raw.value));
+    }
+    return {
+      scale,
+      values,
+      value,
+      property: raw.property,
+      min: 0,
+      max: values.length - 1,
+      steps: values.length - 1,
+      exact: false
+    };
+  }
+  if (raw.min === void 0)
+    throw new Error(t().topic.minRequired);
+  if (raw.max === void 0)
+    throw new Error(t().topic.maxRequired);
+  if (raw.min >= raw.max)
+    throw new Error(t().topic.minGreaterMax);
+  return {
+    scale,
+    min: raw.min,
+    max: raw.max,
+    steps: raw.steps,
+    exact: raw.exact,
+    property: raw.property,
+    value: raw.value !== void 0 ? parseNumber("wert", raw.value) : void 0
+  };
+}
+function parseTopicBlock(content) {
+  const config = { height: DEFAULT_HEIGHT };
+  const raw = { x: {}, y: {} };
+  let hasY = false;
   const lines = content.split("\n");
   for (let i = 0; i < lines.length; i++) {
     const trimmed = lines[i].trim();
@@ -4583,103 +4585,63 @@ function parseTopicBlock(content) {
       case "titel":
       case "\xFCberschrift":
         config.title = value;
-        break;
+        continue;
       case "description":
       case "beschreibung":
       case "desc":
         config.description = value;
-        break;
-      case "scale":
-      case "skala": {
-        const v = value.toLowerCase();
-        if (v === "direkt" || v === "direct")
-          config.scale = "direct";
-        else if (v === "liste" || v === "list")
-          config.scale = "list";
-        else
-          throw new Error(t().topic.unknownScale(value));
-        break;
-      }
-      case "werte":
-      case "values":
-      case "skala-werte":
-      case "scale-values":
-        config.values = parseValueList(value);
-        break;
-      case "min":
-      case "minimum":
-        config.min = parseNumber(key, value);
-        break;
-      case "max":
-      case "maximum":
-        config.max = parseNumber(key, value);
-        break;
-      case "steps":
-      case "schritte":
-      case "zwischenschritte": {
-        const steps = parseNumber(key, value);
-        if (!Number.isInteger(steps) || steps < 1)
-          throw new Error(t().topic.invalidSteps(value));
-        config.steps = steps;
-        break;
-      }
-      case "wert":
-      case "value":
-        if (value)
-          rawValue = value;
-        break;
+        continue;
       case "source":
       case "from":
       case "quelle":
         config.source = value;
-        break;
-      case "x":
-      case "x-axis":
-      case "x-achse":
-      case "xaxis":
-        config.xAxis = value;
-        break;
+        continue;
       case "card-style":
       case "karten-stil":
       case "cardstyle":
       case "style":
       case "stil":
         config.cardStyle = value;
-        break;
-      case "exakt":
-      case "exact":
-        config.exact = value.toLowerCase() === "true" || value.toLowerCase() === "ja";
-        break;
+        continue;
+      case "height":
+      case "hoehe":
+      case "h\xF6he":
+      case "matrix-height":
+      case "matrix-hoehe":
+      case "matrix-h\xF6he": {
+        const height = parseNumber(key, value);
+        if (height > 0)
+          config.height = height;
+        continue;
+      }
+    }
+    let axis = "x";
+    let sub = key;
+    if (key in AXIS_PROPERTY_KEYS) {
+      axis = AXIS_PROPERTY_KEYS[key];
+      sub = "achse";
+    } else {
+      const prefixed = key.match(/^([xy])-(.+)$/);
+      if (prefixed) {
+        axis = prefixed[1];
+        sub = prefixed[2];
+      }
+    }
+    if (applyAxisKey(raw[axis], sub, value) && axis === "y")
+      hasY = true;
+  }
+  config.x = finalizeAxis(raw.x);
+  if (hasY) {
+    try {
+      config.y = finalizeAxis(raw.y);
+    } catch (e) {
+      throw new Error(t().topic.axisError("y", e.message));
     }
   }
-  (_a = config.scale) != null ? _a : config.scale = config.values ? "list" : "direct";
-  if (config.scale === "list") {
-    const values = (_b = config.values) != null ? _b : [];
-    if (values.length < 2)
-      throw new Error(t().topic.valuesRequired);
-    config.min = 0;
-    config.max = values.length - 1;
-    config.steps = values.length - 1;
-    config.exact = false;
-    if (rawValue !== void 0) {
-      const index = indexInList(values, rawValue.replace(/^["'](.*)["']$/, "$1"));
-      if (index === -1)
-        throw new Error(t().topic.unknownValue(rawValue));
-      config.value = index;
-    }
-  } else {
-    config.values = void 0;
-    if (config.min === void 0)
-      throw new Error(t().topic.minRequired);
-    if (config.max === void 0)
-      throw new Error(t().topic.maxRequired);
-    if (config.min >= config.max)
-      throw new Error(t().topic.minGreaterMax);
-    if (rawValue !== void 0)
-      config.value = parseNumber("wert", rawValue);
-  }
-  if (config.source && !config.xAxis)
+  if (config.source && !config.x.property)
     throw new Error(t().topic.xAxisRequired);
+  if (config.source && config.y && !config.y.property)
+    throw new Error(t().topic.yAxisRequired);
   return config;
 }
 function evaluateDotStyle(doc, fn) {
@@ -4705,8 +4667,21 @@ function evaluateDotStyle(doc, fn) {
   }
   return {};
 }
+function applyDotStyle(dot, style) {
+  if (style.size) {
+    dot.style.width = `${style.size}px`;
+    dot.style.height = `${style.size}px`;
+  }
+  if (style.color)
+    dot.style.backgroundColor = style.color;
+  if (style.border)
+    dot.style.boxShadow = `inset 0 0 0 2px ${style.border}`;
+}
 function clean(num) {
   return Math.round(num * 1e9) / 1e9;
+}
+function clamp01(num) {
+  return Math.min(1, Math.max(0, num));
 }
 var TopicRenderer = class extends import_obsidian7.MarkdownRenderChild {
   constructor(containerEl, app, config, ctx, source) {
@@ -4719,144 +4694,241 @@ var TopicRenderer = class extends import_obsidian7.MarkdownRenderChild {
     this.dragging = false;
     /** Layout requested during a drag; executed once the drag ends */
     this.pendingLayout = null;
+    this.sliders = {};
   }
   onload() {
     this.render();
   }
-  get stepSize() {
-    const { min, max, steps } = this.config;
+  // ── Scale helpers ────────────────────────────────────────────────
+  get axes() {
+    return this.config.y ? ["x", "y"] : ["x"];
+  }
+  axis(k) {
+    return k === "x" ? this.config.x : this.config.y;
+  }
+  stepSize(k) {
+    const { min, max, steps } = this.axis(k);
     return steps ? (max - min) / steps : void 0;
   }
-  /** Display text for a scale position */
-  label(pos) {
-    return this.config.values ? this.config.values[Math.round(pos)] : String(pos);
-  }
-  /** Value stored in documents and in the code block for a scale position */
-  toStored(pos) {
-    return this.config.values ? this.config.values[Math.round(pos)] : pos;
-  }
   /** Snap a value onto the scale and clamp it to [min, max] */
-  snap(num) {
-    const { min, max } = this.config;
-    const step = this.stepSize;
+  snap(k, num) {
+    const { min, max } = this.axis(k);
+    const step = this.stepSize(k);
     let v = Math.min(max, Math.max(min, num));
     if (step)
       v = min + Math.round((v - min) / step) * step;
     return clean(v);
   }
+  /** Round an unsnapped value to a precision that fits the scale range */
+  roundExact(k, num) {
+    const { min, max } = this.axis(k);
+    const decimals = Math.max(0, Math.ceil(-Math.log10((max - min) / 100)));
+    return clean(Number(num.toFixed(decimals)));
+  }
+  /** Relative position (0…1) of a scale value */
+  fraction(k, pos) {
+    const { min, max } = this.axis(k);
+    return (pos - min) / (max - min);
+  }
+  /** Scale value at a relative position, snapped (or rounded for `exakt`) */
+  fromFraction(k, fraction) {
+    const { min, max, exact } = this.axis(k);
+    const raw = min + clamp01(fraction) * (max - min);
+    return exact ? this.roundExact(k, raw) : this.snap(k, raw);
+  }
+  /** Display text for a scale position */
+  label(k, pos) {
+    const { values } = this.axis(k);
+    return values ? values[Math.round(pos)] : String(pos);
+  }
+  /** Display text for a point, e.g. "wichtig / 40" */
+  pointLabel(point) {
+    return this.axes.map((k) => this.label(k, point[k])).join(" / ");
+  }
+  /** Value stored in documents and in the code block for a scale position */
+  toStored(k, pos) {
+    const { values } = this.axis(k);
+    return values ? values[Math.round(pos)] : pos;
+  }
+  /** Tick positions of an axis; labelled ticks are "major" */
+  ticks(k) {
+    const { min, max, steps, values } = this.axis(k);
+    if (!steps || steps > MAX_MARKS) {
+      return [{ pos: min, major: true }, { pos: max, major: true }];
+    }
+    const labelEvery = values ? 1 : Math.ceil(steps / MAX_LABELS);
+    const ticks = [];
+    for (let i = 0; i <= steps; i++) {
+      ticks.push({ pos: clean(min + i * this.stepSize(k)), major: i % labelEvery === 0 || i === steps });
+    }
+    return ticks;
+  }
+  /** Half the slider thumb width: the thumb centre's distance from the slider ends */
+  thumbInset() {
+    const width = parseFloat(getComputedStyle(this.containerEl).getPropertyValue("--slider-thumb-width"));
+    return (width || 18) / 2;
+  }
+  /** Vertical pixel position inside the matrix for a y scale value */
+  yToPx(pos) {
+    const inset = this.thumbInset();
+    return inset + this.fraction("y", pos) * (this.config.height - 2 * inset);
+  }
+  /** Scale point under the pointer (x always, y with two axes) */
+  pointAt(clientX, clientY, matrixEl) {
+    const rect = matrixEl.getBoundingClientRect();
+    const point = { x: this.fromFraction("x", (clientX - rect.left) / rect.width) };
+    if (this.config.y) {
+      const inset = this.thumbInset();
+      point.y = this.fromFraction("y", (clientY - rect.top - inset) / (this.config.height - 2 * inset));
+    }
+    return point;
+  }
+  // ── Rendering ────────────────────────────────────────────────────
   render() {
-    var _a;
     const { config } = this;
     const el = this.containerEl;
     el.empty();
     const container = el.createDiv({ cls: "hermione-topic" });
+    container.toggleClass("is-2d", !!config.y);
     if (config.title)
       container.createEl("h4", { cls: "hermione-title", text: config.title });
     if (config.description)
       container.createEl("p", { cls: "hermione-description", text: config.description });
     const grid = container.createDiv({ cls: "hermione-topic-grid" });
-    const slider = grid.createEl("input", { cls: "hermione-topic-slider", type: "range" });
-    slider.min = String(config.min);
-    slider.max = String(config.max);
-    slider.step = this.stepSize ? String(this.stepSize) : "any";
-    const valueEl = grid.createSpan({ cls: "hermione-topic-value" });
-    const initial = this.snap((_a = config.value) != null ? _a : config.min);
-    slider.value = String(initial);
-    valueEl.setText(this.label(initial));
-    const marks = grid.createDiv({ cls: "hermione-topic-marks" });
-    const labels = grid.createDiv({ cls: "hermione-topic-labels" });
-    const addLabel = (fraction, text) => {
-      labels.createSpan({ cls: "hermione-topic-label", text }).style.left = `${fraction * 100}%`;
-    };
-    const { steps } = config;
-    if (steps && steps <= MAX_MARKS) {
-      const labelEvery = config.values ? 1 : Math.ceil(steps / MAX_LABELS);
-      for (let i = 0; i <= steps; i++) {
-        const major = i % labelEvery === 0 || i === steps;
-        const mark = marks.createSpan({ cls: major ? "hermione-topic-mark is-major" : "hermione-topic-mark" });
-        mark.style.left = `${i / steps * 100}%`;
-        if (major)
-          addLabel(i / steps, this.label(clean(config.min + i * this.stepSize)));
-      }
-    } else {
-      for (const fraction of [0, 1]) {
-        marks.createSpan({ cls: "hermione-topic-mark is-major" }).style.left = `${fraction * 100}%`;
-      }
-      addLabel(0, String(config.min));
-      addLabel(1, String(config.max));
-    }
-    if (config.source && config.xAxis) {
+    for (const k of this.axes)
+      this.renderAxis(grid, k);
+    if (config.source) {
       this.setupDocuments(
-        grid.createDiv({ cls: "hermione-topic-docs" }),
+        grid.createDiv({ cls: "hermione-topic-matrix" }),
         grid.createDiv({ cls: "hermione-topic-unassigned" }),
         grid.createDiv({ cls: "hermione-topic-docs-info" })
       );
     }
-    if (config.source && config.xAxis) {
+  }
+  /** Slider, value display, tick marks and labels of one axis */
+  renderAxis(grid, k) {
+    var _a;
+    const a = this.axis(k);
+    const vertical = k === "y";
+    const sliderParent = vertical ? grid.createDiv({ cls: "hermione-topic-yslider", attr: { style: `height: ${this.config.height}px` } }) : grid;
+    const slider = sliderParent.createEl("input", { cls: `hermione-topic-slider is-${k}`, type: "range" });
+    if (vertical)
+      slider.style.width = `${this.config.height}px`;
+    slider.min = String(a.min);
+    slider.max = String(a.max);
+    slider.step = this.stepSize(k) ? String(this.stepSize(k)) : "any";
+    this.sliders[k] = slider;
+    const valueEl = grid.createSpan({ cls: `hermione-topic-value is-${k}` });
+    const initial = this.snap(k, (_a = a.value) != null ? _a : a.min);
+    slider.value = String(initial);
+    valueEl.setText(this.label(k, initial));
+    const marks = grid.createDiv({ cls: `hermione-topic-marks is-${k}` });
+    const labels = grid.createDiv({ cls: `hermione-topic-labels is-${k}` });
+    const place = (el, pos) => {
+      const percent = `${this.fraction(k, pos) * 100}%`;
+      if (vertical)
+        el.style.top = percent;
+      else
+        el.style.left = percent;
+    };
+    if (vertical) {
+      const length = `calc(${this.config.height}px - 2 * var(--hermione-topic-inset))`;
+      marks.style.height = length;
+      labels.style.height = length;
+    }
+    for (const { pos, major } of this.ticks(k)) {
+      place(marks.createSpan({ cls: major ? "hermione-topic-mark is-major" : "hermione-topic-mark" }), pos);
+      if (!major)
+        continue;
+      place(labels.createSpan({ cls: "hermione-topic-label", text: this.label(k, pos) }), pos);
+      if (vertical)
+        labels.createDiv({ cls: "hermione-topic-label-sizer", text: this.label(k, pos) });
+    }
+    if (this.config.source) {
       this.registerDomEvent(slider, "dblclick", (evt) => {
-        if (!this.isOnThumb(slider, evt.clientX))
-          return;
-        void this.createDocument(this.toStored(this.snap(parseFloat(slider.value))));
+        if (this.isOnThumb(slider, k, evt))
+          void this.createDocument();
       });
     }
     this.registerDomEvent(slider, "input", () => {
-      valueEl.setText(this.label(this.snap(parseFloat(slider.value))));
+      valueEl.setText(this.label(k, this.snap(k, parseFloat(slider.value))));
     });
     this.registerDomEvent(slider, "change", () => {
-      const v = this.snap(parseFloat(slider.value));
-      config.value = v;
-      void this.persistValue(this.toStored(v));
+      const v = this.snap(k, parseFloat(slider.value));
+      a.value = v;
+      void this.persistValue(k, this.toStored(k, v));
     });
   }
-  // ── Documents below the scale ────────────────────────────────────
+  /**
+   * Whether the pointer lies on the slider thumb. The thumb centre moves from
+   * half a thumb width at min to (length - half a thumb width) at max.
+   */
+  isOnThumb(slider, k, evt) {
+    const rect = slider.getBoundingClientRect();
+    const thumb = this.thumbInset() * 2;
+    const f = this.fraction(k, parseFloat(slider.value));
+    const [start, length, pointer] = k === "x" ? [rect.left, rect.width, evt.clientX] : [rect.top, rect.height, evt.clientY];
+    const centre = start + thumb / 2 + f * (length - thumb);
+    return Math.abs(pointer - centre) <= thumb / 2 + 2;
+  }
+  // ── Documents in the position matrix ─────────────────────────────
+  /** Map a document property onto an axis position, or report why it can't be placed */
+  resolve(k, raw) {
+    if (raw === void 0 || raw === null || raw === "")
+      return "missing";
+    const { min, max, values } = this.axis(k);
+    if (values) {
+      const index = indexInList(values, raw);
+      return index === -1 ? "notInList" : index;
+    }
+    if (typeof raw !== "number" || isNaN(raw))
+      return "notNumeric";
+    if (raw < min || raw > max)
+      return "outOfRange";
+    return raw;
+  }
   /** Query documents, draw them and keep them up to date */
-  setupDocuments(dotsEl, unassignedEl, infoEl) {
+  setupDocuments(matrixEl, unassignedEl, infoEl) {
     const engine = new QueryEngine(this.app);
     const styleFn = this.config.cardStyle ? compileTransform(this.config.cardStyle) : null;
     let docs = [];
     let unassigned = [];
     const load = async () => {
-      const { min, max, source, xAxis, values } = this.config;
-      let notNumeric = 0;
-      let notInList = 0;
-      let outOfRange = 0;
+      var _a;
+      const problems = /* @__PURE__ */ new Map();
       docs = [];
       unassigned = [];
-      for (const file of engine.getSourceFiles(source)) {
+      for (const file of engine.getSourceFiles(this.config.source)) {
         const doc = await engine.getDocumentData(file);
         if (!doc)
           continue;
-        const raw = engine.getPropertyValue(doc.properties, xAxis);
-        if (raw === void 0 || raw === null || raw === "") {
-          unassigned.push({ doc, style: evaluateDotStyle(doc, styleFn) });
-          continue;
-        }
-        if (values) {
-          const index = indexInList(values, raw);
-          if (index === -1) {
-            notInList++;
-            continue;
+        const point = {};
+        let missing = false;
+        let invalid = false;
+        for (const k of this.axes) {
+          const res = this.resolve(k, engine.getPropertyValue(doc.properties, this.axis(k).property));
+          if (res === "missing") {
+            missing = true;
+          } else if (typeof res === "string") {
+            invalid = true;
+            problems.set(`${res}:${k}`, ((_a = problems.get(`${res}:${k}`)) != null ? _a : 0) + 1);
+          } else {
+            point[k] = res;
           }
-          docs.push({ doc, value: index, style: evaluateDotStyle(doc, styleFn) });
-          continue;
         }
-        if (typeof raw !== "number" || isNaN(raw)) {
-          notNumeric++;
+        if (invalid)
           continue;
-        }
-        if (raw < min || raw > max) {
-          outOfRange++;
-          continue;
-        }
-        docs.push({ doc, value: raw, style: evaluateDotStyle(doc, styleFn) });
+        const style = evaluateDotStyle(doc, styleFn);
+        if (missing)
+          unassigned.push({ doc, style });
+        else
+          docs.push({ doc, point, style });
       }
       infoEl.empty();
-      if (notNumeric)
-        infoEl.createDiv({ text: t().topic.notNumeric(notNumeric, xAxis) });
-      if (notInList)
-        infoEl.createDiv({ text: t().topic.notInList(notInList, xAxis) });
-      if (outOfRange)
-        infoEl.createDiv({ text: t().topic.outOfRange(outOfRange) });
+      for (const [key, count] of problems) {
+        const [reason, k] = key.split(":");
+        infoEl.createDiv({ text: t().topic[reason](count, this.axis(k).property) });
+      }
       layout();
     };
     const layout = () => {
@@ -4864,11 +4936,11 @@ var TopicRenderer = class extends import_obsidian7.MarkdownRenderChild {
         this.pendingLayout = layout;
         return;
       }
-      this.layoutDocuments(dotsEl, docs);
-      this.layoutUnassigned(unassignedEl, dotsEl, unassigned);
+      this.layoutDocuments(matrixEl, docs);
+      this.layoutUnassigned(unassignedEl, matrixEl, unassigned);
     };
     const observer = new ResizeObserver((0, import_obsidian7.debounce)(layout, 50, true));
-    observer.observe(dotsEl);
+    observer.observe(matrixEl);
     this.register(() => observer.disconnect());
     const reload = (0, import_obsidian7.debounce)(() => void load(), 300, true);
     this.registerEvent(this.app.metadataCache.on("changed", reload));
@@ -4877,71 +4949,102 @@ var TopicRenderer = class extends import_obsidian7.MarkdownRenderChild {
     void load();
   }
   /**
-   * Place each document as a circle at the exact position of its value.
-   * Documents are processed from left to right; each goes into the topmost
-   * row where it does not overlap the previous circle of that row.
-   * All rows share the height of the largest circle.
+   * Place each document as a circle at the exact position of its values.
+   * Processing starts top left (sorted by y, then x). A circle that would
+   * overlap an already placed one moves down by one row until it is free;
+   * later circles are again aligned with the scale.
+   * With one axis all circles start in the top row, which yields rows.
    */
-  layoutDocuments(dotsEl, docs) {
+  layoutDocuments(matrixEl, docs) {
     var _a;
-    const { min, max } = this.config;
-    const width = dotsEl.clientWidth;
-    dotsEl.empty();
-    const sorted = [...docs].sort((a, b) => a.value - b.value || a.doc.name.localeCompare(b.doc.name));
-    const rowHeight = Math.max(DOT_SIZE, ...sorted.map((d) => {
+    const twoD = !!this.config.y;
+    const width = matrixEl.clientWidth;
+    matrixEl.empty();
+    if (twoD)
+      this.drawGridLines(matrixEl);
+    const sorted = [...docs].sort((a, b) => {
+      var _a2, _b;
+      return ((_a2 = a.point.y) != null ? _a2 : 0) - ((_b = b.point.y) != null ? _b : 0) || a.point.x - b.point.x || a.doc.name.localeCompare(b.doc.name);
+    });
+    const rowStep = Math.max(DOT_SIZE, ...sorted.map((d) => {
       var _a2;
       return (_a2 = d.style.size) != null ? _a2 : DOT_SIZE;
     })) + DOT_GAP2;
-    const rowEnds = [];
-    for (const { doc, value, style } of sorted) {
+    const placed = [];
+    let bottom = 0;
+    for (const { doc, point, style } of sorted) {
       const size = (_a = style.size) != null ? _a : DOT_SIZE;
-      const fraction = (value - min) / (max - min);
-      const left = fraction * width - size / 2;
-      let row = rowEnds.findIndex((end) => left - end >= DOT_GAP2);
-      if (row === -1)
-        row = rowEnds.length;
-      rowEnds[row] = left + size;
-      const dot = dotsEl.createDiv({ cls: "hermione-topic-doc" });
-      dot.style.left = `${fraction * 100}%`;
-      dot.style.top = `${row * rowHeight + (rowHeight - DOT_GAP2 - size) / 2}px`;
-      if (style.size) {
-        dot.style.width = `${size}px`;
-        dot.style.height = `${size}px`;
-      }
-      if (style.color)
-        dot.style.backgroundColor = style.color;
-      if (style.border)
-        dot.style.boxShadow = `inset 0 0 0 2px ${style.border}`;
-      (0, import_obsidian7.setTooltip)(dot, t().topic.docTooltip(doc.name, this.label(value)));
-      this.makeDraggable(dot, dotsEl, doc, value);
+      const r = size / 2;
+      const fx = this.fraction("x", point.x);
+      const cx = fx * width;
+      let cy = twoD ? this.yToPx(point.y) : (rowStep - DOT_GAP2) / 2;
+      while (placed.some((p) => Math.hypot(p.cx - cx, p.cy - cy) < p.r + r + DOT_GAP2))
+        cy += rowStep;
+      placed.push({ cx, cy, r });
+      bottom = Math.max(bottom, cy + r);
+      const dot = matrixEl.createDiv({ cls: "hermione-topic-doc" });
+      dot.style.left = `${fx * 100}%`;
+      dot.style.top = `${cy - r}px`;
+      applyDotStyle(dot, style);
+      (0, import_obsidian7.setTooltip)(dot, t().topic.docTooltip(doc.name, this.pointLabel(point)));
+      this.makeDraggable(dot, matrixEl, doc, point, size);
     }
-    dotsEl.style.height = `${rowEnds.length * rowHeight}px`;
+    const needed = placed.length ? bottom + DOT_GAP2 : 0;
+    matrixEl.style.height = `${twoD ? Math.max(this.config.height, needed) : needed}px`;
+  }
+  /** Faint lines at the labelled ticks of both axes (two axes only) */
+  drawGridLines(matrixEl) {
+    for (const { pos, major } of this.ticks("x")) {
+      if (major)
+        matrixEl.createDiv({ cls: "hermione-topic-gridline is-x" }).style.left = `${this.fraction("x", pos) * 100}%`;
+    }
+    for (const { pos, major } of this.ticks("y")) {
+      if (major)
+        matrixEl.createDiv({ cls: "hermione-topic-gridline is-y" }).style.top = `${this.yToPx(pos)}px`;
+    }
+  }
+  /** Write the given point into the document's axis properties */
+  async writePoint(file, point) {
+    await this.app.fileManager.processFrontMatter(file, (fm) => {
+      for (const k of this.axes)
+        fm[this.axis(k).property] = this.toStored(k, point[k]);
+    });
+  }
+  /** Run a layout that was deferred because of an active drag */
+  endDrag() {
+    this.dragging = false;
+    const pending = this.pendingLayout;
+    this.pendingLayout = null;
+    pending == null ? void 0 : pending();
   }
   /**
-   * Drag a circle horizontally within the scale to set the document's value.
-   * A click without movement opens the document instead.
+   * Drag a circle within the position matrix to set the document's values:
+   * horizontally only with one axis, freely with two. The circle snaps to
+   * the scale while dragging. A click without movement opens the document.
    * Listeners are attached directly: the dot is discarded on the next layout.
    */
-  makeDraggable(dot, dotsEl, doc, original) {
-    const { min, max } = this.config;
+  makeDraggable(dot, matrixEl, doc, original, size) {
+    const originalLeft = dot.style.left;
+    const originalTop = dot.style.top;
     let startX = 0;
+    let startY = 0;
     let moved = false;
     let current = original;
     let badge = null;
-    const valueAt = (clientX) => this.valueAt(clientX, dotsEl);
     dot.addEventListener("pointerdown", (evt) => {
       if (evt.button !== 0)
         return;
       evt.preventDefault();
       dot.setPointerCapture(evt.pointerId);
       startX = evt.clientX;
+      startY = evt.clientY;
       moved = false;
       current = original;
     });
     dot.addEventListener("pointermove", (evt) => {
       if (!dot.hasPointerCapture(evt.pointerId))
         return;
-      if (!moved && Math.abs(evt.clientX - startX) < DRAG_THRESHOLD2)
+      if (!moved && Math.hypot(evt.clientX - startX, evt.clientY - startY) < DRAG_THRESHOLD2)
         return;
       if (!moved) {
         moved = true;
@@ -4949,9 +5052,11 @@ var TopicRenderer = class extends import_obsidian7.MarkdownRenderChild {
         dot.addClass("is-dragging");
         badge = dot.createSpan({ cls: "hermione-topic-doc-badge" });
       }
-      current = valueAt(evt.clientX);
-      dot.style.left = `${(current - min) / (max - min) * 100}%`;
-      badge.setText(this.label(current));
+      current = this.pointAt(evt.clientX, evt.clientY, matrixEl);
+      dot.style.left = `${this.fraction("x", current.x) * 100}%`;
+      if (this.config.y)
+        dot.style.top = `${this.yToPx(current.y) - size / 2}px`;
+      badge.setText(this.pointLabel(current));
     });
     const finish = async (evt, cancelled) => {
       if (dot.hasPointerCapture(evt.pointerId))
@@ -4965,58 +5070,41 @@ var TopicRenderer = class extends import_obsidian7.MarkdownRenderChild {
       dot.removeClass("is-dragging");
       badge == null ? void 0 : badge.remove();
       badge = null;
-      this.dragging = false;
-      if (!cancelled && current !== original) {
-        await this.app.fileManager.processFrontMatter(doc.file, (fm) => {
-          fm[this.config.xAxis] = this.toStored(current);
-        });
+      const changed = this.axes.some((k) => current[k] !== original[k]);
+      if (!cancelled && changed) {
+        await this.writePoint(doc.file, current);
       } else {
-        dot.style.left = `${(original - min) / (max - min) * 100}%`;
+        dot.style.left = originalLeft;
+        dot.style.top = originalTop;
       }
-      const pending = this.pendingLayout;
-      this.pendingLayout = null;
-      pending == null ? void 0 : pending();
+      this.endDrag();
     };
     dot.addEventListener("pointerup", (evt) => void finish(evt, false));
     dot.addEventListener("pointercancel", (evt) => void finish(evt, true));
   }
-  /** Scale position under clientX, snapped (or rounded for `exakt`) and clamped */
-  valueAt(clientX, dotsEl) {
-    const { min, max } = this.config;
-    const rect = dotsEl.getBoundingClientRect();
-    const fraction = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-    const raw = min + fraction * (max - min);
-    return this.config.exact ? this.roundExact(raw) : this.snap(raw);
-  }
-  /** Draw documents without the scale property as a row of circles at the foot */
-  layoutUnassigned(unassignedEl, dotsEl, docs) {
+  /** Draw documents without (all) axis properties as a row of circles at the foot */
+  layoutUnassigned(unassignedEl, matrixEl, docs) {
     unassignedEl.empty();
     unassignedEl.toggle(docs.length > 0);
     if (!docs.length)
       return;
-    unassignedEl.createDiv({ cls: "hermione-topic-unassigned-title", text: t().topic.unassigned(this.config.xAxis) });
+    const props = this.axes.map((k) => this.axis(k).property);
+    unassignedEl.createDiv({ cls: "hermione-topic-unassigned-title", text: t().topic.unassigned(props) });
     const row = unassignedEl.createDiv({ cls: "hermione-topic-unassigned-dots" });
     for (const { doc, style } of [...docs].sort((a, b) => a.doc.name.localeCompare(b.doc.name))) {
       const dot = row.createDiv({ cls: "hermione-topic-doc is-unassigned" });
-      if (style.size) {
-        dot.style.width = `${style.size}px`;
-        dot.style.height = `${style.size}px`;
-      }
-      if (style.color)
-        dot.style.backgroundColor = style.color;
-      if (style.border)
-        dot.style.boxShadow = `inset 0 0 0 2px ${style.border}`;
+      applyDotStyle(dot, style);
       (0, import_obsidian7.setTooltip)(dot, doc.name);
-      this.makeAssignable(dot, dotsEl, unassignedEl, doc);
+      this.makeAssignable(dot, matrixEl, unassignedEl, doc);
     }
   }
   /**
-   * Drag a circle from the foot onto the scale to give the document a value.
-   * The circle follows the pointer freely; it is assigned only when released
-   * above the foot area, using the scale position under the pointer.
-   * A click without movement opens the document.
+   * Drag a circle from the foot onto the position matrix to give the document
+   * its values. The circle follows the pointer freely; it is assigned only
+   * when released above the foot area, using the scale point under the
+   * pointer. A click without movement opens the document.
    */
-  makeAssignable(dot, dotsEl, footEl, doc) {
+  makeAssignable(dot, matrixEl, footEl, doc) {
     let startX = 0;
     let startY = 0;
     let moved = false;
@@ -5046,8 +5134,8 @@ var TopicRenderer = class extends import_obsidian7.MarkdownRenderChild {
         badge = dot.createSpan({ cls: "hermione-topic-doc-badge" });
       }
       dot.style.transform = `translate(${dx}px, ${dy}px)`;
-      target = evt.clientY < footEl.getBoundingClientRect().top ? this.valueAt(evt.clientX, dotsEl) : null;
-      badge.setText(target === null ? "\u2013" : this.label(target));
+      target = evt.clientY < footEl.getBoundingClientRect().top ? this.pointAt(evt.clientX, evt.clientY, matrixEl) : null;
+      badge.setText(target === null ? "\u2013" : this.pointLabel(target));
     });
     const finish = async (evt, cancelled) => {
       if (dot.hasPointerCapture(evt.pointerId))
@@ -5061,69 +5149,50 @@ var TopicRenderer = class extends import_obsidian7.MarkdownRenderChild {
       dot.removeClass("is-dragging");
       badge == null ? void 0 : badge.remove();
       badge = null;
-      this.dragging = false;
       if (!cancelled && target !== null) {
-        const value = this.toStored(target);
-        await this.app.fileManager.processFrontMatter(doc.file, (fm) => {
-          fm[this.config.xAxis] = value;
-        });
+        await this.writePoint(doc.file, target);
       } else {
         dot.style.transform = "";
       }
-      const pending = this.pendingLayout;
-      this.pendingLayout = null;
-      pending == null ? void 0 : pending();
+      this.endDrag();
     };
     dot.addEventListener("pointerup", (evt) => void finish(evt, false));
     dot.addEventListener("pointercancel", (evt) => void finish(evt, true));
   }
-  /** Round an unsnapped value to a precision that fits the scale range */
-  roundExact(num) {
-    const { min, max } = this.config;
-    const decimals = Math.max(0, Math.ceil(-Math.log10((max - min) / 100)));
-    return clean(Number(num.toFixed(decimals)));
-  }
-  /**
-   * Whether clientX lies on the slider thumb. The thumb centre moves from
-   * half a thumb width at min to (width - half a thumb width) at max.
-   */
-  isOnThumb(slider, clientX) {
-    const { min, max } = this.config;
-    const rect = slider.getBoundingClientRect();
-    const thumb = parseFloat(getComputedStyle(slider).getPropertyValue("--slider-thumb-width")) || 18;
-    const fraction = (parseFloat(slider.value) - min) / (max - min);
-    const centre = rect.left + thumb / 2 + fraction * (rect.width - thumb);
-    return Math.abs(clientX - centre) <= thumb / 2 + 2;
-  }
+  // ── Creating documents ───────────────────────────────────────────
   /**
    * Create "<Dokument>-<n>.md" (first free n) in the source folder with the
-   * scale property set to the given value. The document is not opened;
-   * the change listener picks it up and draws its circle.
+   * axis properties set to the current slider values. The document is not
+   * opened; the change listener picks it up and draws its circle.
    */
-  async createDocument(value) {
+  async createDocument() {
     const source = this.config.source.replace(/^"(.*)"$/, "$1");
     const folder = this.app.vault.getAbstractFileByPath((0, import_obsidian7.normalizePath)(source));
     if (!(folder instanceof import_obsidian7.TFolder)) {
       new import_obsidian7.Notice(t().topic.sourceNotFolder(source));
       return;
     }
+    const point = { x: this.snap("x", parseFloat(this.sliders.x.value)) };
+    if (this.config.y)
+      point.y = this.snap("y", parseFloat(this.sliders.y.value));
     const base = t().topic.newDocBaseName;
     const prefix = folder.isRoot() ? "" : `${folder.path}/`;
     let n = 1;
     while (this.app.vault.getAbstractFileByPath(`${prefix}${base}-${n}.md`))
       n++;
     const file = await this.app.vault.create(`${prefix}${base}-${n}.md`, "");
-    await this.app.fileManager.processFrontMatter(file, (fm) => {
-      fm[this.config.xAxis] = value;
-    });
+    await this.writePoint(file, point);
     new import_obsidian7.Notice(t().topic.created(file.basename));
   }
-  /** Write `wert: <value>` into the code block source */
-  async persistValue(value) {
+  // ── Persisting slider values in the code block ───────────────────
+  /** Write the slider value of an axis into the code block (`wert` / `x-wert`, `y-wert`) */
+  async persistValue(k, value) {
     const file = this.app.vault.getAbstractFileByPath(this.ctx.sourcePath);
     if (!(file instanceof import_obsidian7.TFile))
       return;
     const info = this.ctx.getSectionInfo(this.containerEl);
+    const keys = VALUE_KEYS[k];
+    const newKey = k === "y" ? "y-wert" : this.config.y ? "x-wert" : "wert";
     await this.app.vault.process(file, (data) => {
       const eol = data.includes("\r\n") ? "\r\n" : "\n";
       const lines = data.split(/\r?\n/);
@@ -5134,15 +5203,17 @@ var TopicRenderer = class extends import_obsidian7.MarkdownRenderChild {
       }
       for (let i = block.start + 1; i < block.end; i++) {
         const match = lines[i].match(/^(\s*)([^:]+):/);
-        if (match && VALUE_KEYS.includes(match[2].trim().toLowerCase())) {
+        if (match && keys.includes(match[2].trim().toLowerCase())) {
           lines[i] = `${match[1]}${match[2].trim()}: ${value}`;
           return lines.join(eol);
         }
       }
-      lines.splice(block.end, 0, `wert: ${value}`);
+      lines.splice(block.end, 0, `${newKey}: ${value}`);
       return lines.join(eol);
     });
-    this.source = this.source.replace(/^(\s*(?:wert|value)\s*:).*$/im, `$1 ${value}`);
+    const keyPattern = new RegExp(`^(\\s*(?:${keys.join("|")})\\s*:).*$`, "im");
+    this.source = keyPattern.test(this.source) ? this.source.replace(keyPattern, `$1 ${value}`) : `${this.source.replace(/\s*$/, "")}
+${newKey}: ${value}`;
   }
   /**
    * Locate this block (opening/closing fence line indices).

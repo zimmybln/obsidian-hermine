@@ -85,14 +85,16 @@ export interface Strings {
     valuesRequired: string;
     unknownValue: (raw: string) => string;
     notInList: (count: number, prop: string) => string;
-    unassigned: (prop: string) => string;
+    unassigned: (props: string[]) => string;
     xAxisRequired: string;
+    yAxisRequired: string;
+    axisError: (axis: string, msg: string) => string;
     newDocBaseName: string;
     created: (name: string) => string;
     sourceNotFolder: (source: string) => string;
     docTooltip: (name: string, value: string | number) => string;
     notNumeric: (count: number, prop: string) => string;
-    outOfRange: (count: number) => string;
+    outOfRange: (count: number, prop: string) => string;
   };
 }
 
@@ -175,19 +177,22 @@ const de: Strings = {
     invalidSteps: (raw) => `Schritte müssen eine ganze Zahl ≥ 1 sein, erhalten: "${raw}"`,
     unknownScale: (raw) => `Unbekannte Skala: "${raw}" (erlaubt: direkt, liste)`,
     valuesRequired: "Eine Listen-Skala benötigt mindestens zwei Werte (werte)",
-    unassigned: (prop) => `Ohne Wert in "${prop}" – auf die Skala ziehen, um einen Wert zu setzen`,
+    unassigned: (props) =>
+      `Ohne Wert in ${props.map(p => `"${p}"`).join(" bzw. ")} – auf die Positionsmatrix ziehen, um Werte zu setzen`,
     unknownValue: (raw) => `Wert "${raw}" kommt in der Skala nicht vor`,
     notInList: (count, prop) =>
       `${count} ${count === 1 ? "Dokument hat" : "Dokumente haben"} in "${prop}" einen Wert, der nicht in der Skala vorkommt`,
     xAxisRequired: "Mit source muss auch x-achse (Eigenschaft der Dokumente) angegeben werden",
+    yAxisRequired: "Mit source und einer y-Skala muss auch y-achse (Eigenschaft der Dokumente) angegeben werden",
+    axisError: (axis, msg) => `${axis.toUpperCase()}-Achse: ${msg}`,
     newDocBaseName: "Dokument",
     created: (name) => `"${name}" erstellt`,
     sourceNotFolder: (source) => `Neue Dokumente benötigen ein Verzeichnis als Quelle, nicht "${source}"`,
     docTooltip: (name, value) => `${name}: ${value}`,
     notNumeric: (count, prop) =>
       `${count} ${count === 1 ? "Dokument hat" : "Dokumente haben"} keinen Zahlenwert in "${prop}"`,
-    outOfRange: (count) =>
-      `${count} ${count === 1 ? "Dokument liegt" : "Dokumente liegen"} außerhalb der Skala`,
+    outOfRange: (count, prop) =>
+      `${count} ${count === 1 ? "Dokument liegt" : "Dokumente liegen"} mit "${prop}" außerhalb der Skala`,
   },
 };
 
@@ -270,19 +275,22 @@ const en: Strings = {
     invalidSteps: (raw) => `Steps must be an integer ≥ 1, got: "${raw}"`,
     unknownScale: (raw) => `Unknown scale: "${raw}" (allowed: direct, list)`,
     valuesRequired: "A list scale requires at least two values (values)",
-    unassigned: (prop) => `No value in "${prop}" – drag onto the scale to set one`,
+    unassigned: (props) =>
+      `No value in ${props.map(p => `"${p}"`).join(" or ")} – drag onto the position matrix to set values`,
     unknownValue: (raw) => `Value "${raw}" is not part of the scale`,
     notInList: (count, prop) =>
       `${count} ${count === 1 ? "document has" : "documents have"} a value in "${prop}" that is not part of the scale`,
     xAxisRequired: "When source is set, x-axis (document property) is required",
+    yAxisRequired: "When source and a y scale are set, y-axis (document property) is required",
+    axisError: (axis, msg) => `${axis.toUpperCase()} axis: ${msg}`,
     newDocBaseName: "Document",
     created: (name) => `"${name}" created`,
     sourceNotFolder: (source) => `New documents require a folder as source, not "${source}"`,
     docTooltip: (name, value) => `${name}: ${value}`,
     notNumeric: (count, prop) =>
       `${count} ${count === 1 ? "document has" : "documents have"} no numeric value in "${prop}"`,
-    outOfRange: (count) =>
-      `${count} ${count === 1 ? "document lies" : "documents lie"} outside the scale`,
+    outOfRange: (count, prop) =>
+      `${count} ${count === 1 ? "document lies" : "documents lie"} outside the scale in "${prop}"`,
   },
 };
 

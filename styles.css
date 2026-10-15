@@ -1526,95 +1526,228 @@
   margin: 0;
 }
 
-/* hermione-topic: interactive slider */
+/* hermione-topic: interactive slider(s) with position matrix */
 .hermione-topic {
   margin: 1em 0;
-  /* horizontal inset so marks line up with the thumb centre at min/max */
+  /* thumb centre distance from the slider ends; marks and matrix are inset by it */
   --hermione-topic-inset: calc(var(--slider-thumb-width, 18px) / 2);
 }
 
+/*
+ * Grid areas
+ *   xs/xv: x slider and value     xm/xl: x marks and labels
+ *   ys/yv: y slider and value     ym/yl: y marks and labels
+ *   mx: position matrix   ft: documents without values   in: notes
+ */
 .hermione-topic-grid {
   display: grid;
   grid-template-columns: 1fr auto;
-  column-gap: 0.75em;
+  grid-template-areas:
+    "xs xv"
+    "xm ."
+    "xl ."
+    "mx ."
+    "ft ."
+    "in .";
   align-items: center;
 }
 
+/* Two axes: corner top left, y axis on the left, matrix right of / below the labels */
+.hermione-topic.is-2d .hermione-topic-grid {
+  grid-template-columns: auto auto auto 1fr auto;
+  grid-template-areas:
+    ".  .  .  xs xv"
+    ".  .  .  xm ."
+    ".  .  .  xl ."
+    "ys ym yl mx ."
+    "yv yv yv ft ."
+    ".  .  .  in .";
+}
+
+/* ── Sliders ── */
+
 /* Selector must outrank Obsidian's input[type='range'] rule, which sets a fixed width */
 .hermione-topic input.hermione-topic-slider[type="range"] {
-  grid-column: 1;
-  grid-row: 1;
-  justify-self: stretch;
-  width: 100%;
   min-width: 0;
   max-width: none;
   margin: 0;
 }
 
+.hermione-topic input.hermione-topic-slider.is-x[type="range"] {
+  grid-area: xs;
+  justify-self: stretch;
+  width: 100%;
+}
+
+.hermione-topic-yslider {
+  grid-area: ys;
+  align-self: start;
+  position: relative;
+  width: 24px;
+}
+
+/* Rotated horizontal slider: min at the top, centred in the wrapper (width set inline) */
+.hermione-topic input.hermione-topic-slider.is-y[type="range"] {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform-origin: 0 0;
+  transform: rotate(90deg) translateY(-50%);
+}
+
 .hermione-topic-value {
-  grid-column: 2;
-  grid-row: 1;
-  min-width: 3em;
-  text-align: right;
   font-variant-numeric: tabular-nums;
   font-weight: var(--font-semibold);
   color: var(--text-normal);
+  white-space: nowrap;
 }
+
+.hermione-topic-value.is-x {
+  grid-area: xv;
+  min-width: 3em;
+  margin-left: 0.75em;
+  text-align: right;
+}
+
+.hermione-topic-value.is-y {
+  grid-area: yv;
+  align-self: start;
+  padding-top: 4px;
+}
+
+/* ── Tick marks and labels ── */
 
 .hermione-topic-marks,
 .hermione-topic-labels {
-  grid-column: 1;
   position: relative;
+}
+
+.hermione-topic-marks.is-x,
+.hermione-topic-labels.is-x {
   margin: 0 var(--hermione-topic-inset);
 }
 
-.hermione-topic-marks {
-  grid-row: 2;
+.hermione-topic-marks.is-x {
+  grid-area: xm;
   height: 10px;
   margin-top: 2px;
 }
 
+.hermione-topic-labels.is-x {
+  grid-area: xl;
+  height: 1.4em;
+}
+
+/* Vertical axis: height set inline (axis length minus thumb insets) */
+.hermione-topic-marks.is-y,
+.hermione-topic-labels.is-y {
+  align-self: start;
+  margin-top: var(--hermione-topic-inset);
+}
+
+.hermione-topic-marks.is-y {
+  grid-area: ym;
+  width: 10px;
+  margin-left: 2px;
+}
+
+.hermione-topic-labels.is-y {
+  grid-area: yl;
+  padding: 0 0.75em 0 2px;
+}
+
 .hermione-topic-mark {
   position: absolute;
+  background-color: var(--text-faint);
+}
+
+.hermione-topic-marks.is-x .hermione-topic-mark {
   top: 0;
   width: 1px;
   height: 5px;
   transform: translateX(-50%);
-  background-color: var(--text-faint);
+}
+
+.hermione-topic-marks.is-y .hermione-topic-mark {
+  left: 0;
+  width: 5px;
+  height: 1px;
+  transform: translateY(-50%);
 }
 
 .hermione-topic-mark.is-major {
-  height: 9px;
   background-color: var(--text-muted);
 }
 
-.hermione-topic-labels {
-  grid-row: 3;
-  height: 1.4em;
-  font-size: var(--font-ui-smaller);
-  color: var(--text-muted);
+.hermione-topic-marks.is-x .hermione-topic-mark.is-major {
+  height: 9px;
+}
+
+.hermione-topic-marks.is-y .hermione-topic-mark.is-major {
+  width: 9px;
 }
 
 .hermione-topic-label {
   position: absolute;
+  white-space: nowrap;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.hermione-topic-labels.is-x .hermione-topic-label {
   top: 0;
   transform: translateX(-50%);
+}
+
+.hermione-topic-labels.is-y .hermione-topic-label {
+  left: 2px;
+  transform: translateY(-50%);
+}
+
+/* Invisible copies of the y labels that give the label column its width */
+.hermione-topic-label-sizer {
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
   white-space: nowrap;
+  font-size: var(--font-ui-smaller);
 }
 
-/* Documents below the scale (size/gap in sync with DOT_SIZE/DOT_GAP in topic.ts) */
-.hermione-topic-docs,
-.hermione-topic-docs-info {
-  grid-column: 1;
-  margin: 0 var(--hermione-topic-inset);
-}
+/* ── Position matrix ── */
 
-.hermione-topic-docs {
-  grid-row: 4;
+.hermione-topic-matrix {
+  grid-area: mx;
+  align-self: start;
   position: relative;
-  margin-top: 6px;
+  margin: 6px var(--hermione-topic-inset) 0;
 }
 
+/* Two axes: top edge aligned with the y slider */
+.hermione-topic.is-2d .hermione-topic-matrix {
+  margin-top: 0;
+  border-radius: var(--radius-s);
+  background-color: var(--background-secondary);
+}
+
+.hermione-topic-gridline {
+  position: absolute;
+  background-color: var(--background-modifier-border);
+  pointer-events: none;
+}
+
+.hermione-topic-gridline.is-x {
+  top: 0;
+  bottom: 0;
+  width: 1px;
+}
+
+.hermione-topic-gridline.is-y {
+  left: 0;
+  right: 0;
+  height: 1px;
+}
+
+/* Document circles (size/gap in sync with DOT_SIZE/DOT_GAP in topic.ts) */
 .hermione-topic-doc {
   position: absolute;
   width: 12px;
@@ -1623,24 +1756,13 @@
   transform: translateX(-50%);
   background-color: var(--interactive-accent);
   cursor: pointer;
+  touch-action: none;
 }
 
 /* outline instead of background/box-shadow so it also works with card-style inline styles */
 .hermione-topic-doc:hover {
   outline: 2px solid var(--text-muted);
   outline-offset: 1px;
-}
-
-.hermione-topic-docs-info {
-  grid-row: 6;
-  margin-top: 4px;
-  font-size: var(--font-ui-smaller);
-  color: var(--text-faint);
-}
-
-/* Dragging a document circle */
-.hermione-topic-doc {
-  touch-action: none;
 }
 
 .hermione-topic-doc.is-dragging {
@@ -1666,10 +1788,10 @@
   pointer-events: none;
 }
 
-/* Documents without the scale property, at the foot of the view */
+/* ── Documents without values, at the foot of the view ── */
+
 .hermione-topic-unassigned {
-  grid-column: 1;
-  grid-row: 5;
+  grid-area: ft;
   margin: 10px var(--hermione-topic-inset) 0;
   padding-top: 6px;
   border-top: 1px dashed var(--background-modifier-border);
@@ -1687,7 +1809,7 @@
   gap: 4px;
 }
 
-/* Flow layout instead of absolute positioning on the scale */
+/* Flow layout instead of absolute positioning in the matrix */
 .hermione-topic-doc.is-unassigned {
   position: relative;
   flex: none;
@@ -1697,4 +1819,11 @@
 
 .hermione-topic-doc.is-unassigned.is-dragging {
   opacity: 1;
+}
+
+.hermione-topic-docs-info {
+  grid-area: in;
+  margin: 4px var(--hermione-topic-inset) 0;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
 }

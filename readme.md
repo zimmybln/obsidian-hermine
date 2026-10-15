@@ -114,3 +114,27 @@ wert: 40
 | `schritte` | `steps`, `zwischenschritte` | Anzahl der Intervalle zwischen min und max (`0..100` mit `10` → 0, 10, …, 100). Ohne Angabe: stufenlos |
 | `wert` | `value` | Aktueller Wert (wird vom Slider gesetzt) |
 | `titel`, `beschreibung` | `title`, `description` | Optionale Überschrift und Beschreibung |
+
+### Zwei Achsen (Positionsmatrix)
+
+Alle Skalen-Eigenschaften können mit `x-` bzw. `y-` vorangestellt werden. Ohne Präfix gelten sie für die x-Achse.
+Sobald eine `y-`-Eigenschaft angegeben ist, wird zusätzlich ein vertikaler Slider links angezeigt (Schnittpunkt oben links).
+Die Dokumente werden in der Positionsmatrix rechts bzw. unterhalb der Skalenbeschriftungen dargestellt.
+
+```hermione-topic
+source: Projekte
+x-achse: Wichtigkeit
+x-werte: "Nicht wichtig", "mittel wichtig", "wichtig", "sehr wichtig"
+y-achse: Aufwand
+y-min: 0
+y-max: 10
+y-schritte: 10
+hoehe: 300
+```
+
+| Eigenschaft | Bedeutung |
+|---|---|
+| `x-achse`, `y-achse` | Eigenschaft der Dokumente je Achse |
+| `x-min`, `x-max`, `x-schritte`, `x-werte`, `x-skala`, `x-exakt` (analog `y-…`) | Skala je Achse |
+| `x-wert`, `y-wert` | Aktuelle Slider-Werte (werden vom Slider gesetzt) |
+| `hoehe` | Länge der y-Achse bzw. Höhe der Positionsmatrix in Pixel (Standard 240) |
